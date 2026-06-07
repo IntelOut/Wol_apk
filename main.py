@@ -12,6 +12,7 @@ import json
 import os
 import re
 import socket
+import sys
 
 import flet as ft
 from flet.controls.margin import Margin
@@ -19,8 +20,9 @@ from flet.controls.padding import Padding
 from flet.security import decrypt, encrypt
 
 DATA_FILE = "devices.json"
-CRYPT_KEY = "wol-app-secret-key-32bytes"
-VERSION = "0.3.2"
+SETTINGS_FILE = "settings.json"
+CRYPT_KEY = "FsxFtSDzEHDRJd5H7IXuQZOa6fyK585I"
+VERSION = "0.4.0"
 
 
 def _validate_mac(mac: str) -> bool:
@@ -91,6 +93,21 @@ def _save_devices(devices: list) -> None:
         f.write(encrypted)
 
 
+def _load_settings() -> dict:
+    if not os.path.exists(SETTINGS_FILE):
+        return {}
+    try:
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_settings(settings: dict) -> None:
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(settings, f)
+
+
 class WolApp:
     """Encapsulates all WOL application state and event handlers.
 
@@ -100,6 +117,8 @@ class WolApp:
 
     def __init__(self, page: ft.Page):
         self.page = page
+        self._sending = False
+        self._pending_delete_index = None
         self._setup_page()
         self._build_controls()
         self.refresh_device_list()
@@ -109,14 +128,33 @@ class WolApp:
 
     def _setup_page(self):
         """Configure page title, scroll, theme, and app bar."""
-        self.page.title = "Wake on LAN"
+        self.page.title = f"Wake on LAN v{VERSION}" if sys.platform == "win32" else "Wake on LAN"
         self.page.padding = 0
         self.page.scroll = ft.ScrollMode.AUTO
-        self.page.theme_mode = ft.ThemeMode.SYSTEM
+        settings = _load_settings()
+        theme_key = settings.get("theme_mode", "dark")
+        self._is_dark = theme_key != "light"
+        self.page.theme_mode = ft.ThemeMode.DARK if self._is_dark else ft.ThemeMode.LIGHT
         self.page.appbar = ft.AppBar(
+            leading=ft.IconButton(
+                icon=ft.Icons.MENU,
+                on_click=lambda _: self.page.run_task(self.open_drawer),
+            ),
             title=ft.Text("Wake on LAN", size=20, weight=ft.FontWeight.BOLD),
-            center_title=True,
+            center_title=False,
             bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+            actions=[
+                ft.IconButton(
+                    icon=ft.Icons.DARK_MODE if self._is_dark else ft.Icons.LIGHT_MODE,
+                    tooltip="Toggle theme",
+                    on_click=self._on_theme_toggle,
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.SETTINGS,
+                    tooltip="Network settings",
+                    on_click=lambda _: self.open_settings(),
+                ),
+            ],
         )
         self.page.theme = ft.Theme(
             color_scheme=ft.ColorScheme(primary=ft.Colors.INDIGO),
@@ -136,6 +174,7 @@ class WolApp:
             border_radius=12,
             text_size=16,
             expand=True,
+            on_change=self._validate_mac_field,
         )
         self.mac_helper = ft.Icon(
             ft.Icons.HELP_OUTLINE,
@@ -196,11 +235,165 @@ class WolApp:
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.CENTER,
                 spacing=8,
             ),
             padding=Padding.symmetric(vertical=40, horizontal=20),
         )
         self.loading = ft.ProgressRing(width=24, height=24, visible=False)
+
+        self.wake_button = ft.Button(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(
+                        ft.Icons.POWER_SETTINGS_NEW,
+                        size=24,
+                    ),
+                    ft.Text("Wake Up", size=18),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            style=ft.ButtonStyle(
+                padding=Padding.symmetric(
+                    horizontal=30, vertical=14
+                ),
+                shape=ft.RoundedRectangleBorder(
+                    radius=12
+                ),
+            ),
+            expand=True,
+            on_click=self.on_wake_click,
+        )
+
+        self.settings_dialog = ft.AlertDialog(
+            title=ft.Text("Network settings", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Column(
+                controls=[
+                    self.ip_input,
+                    self.port_input,
+                ],
+                spacing=8,
+                width=300,
+                height=140,
+                tight=True,
+            ),
+            actions=[
+                ft.TextButton("Close", on_click=lambda _: self.close_settings()),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self.confirm_delete_dialog = ft.AlertDialog(
+            title=ft.Text("Delete device", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Text("Are you sure you want to delete this device?"),
+            actions=[
+                ft.TextButton("Cancel", on_click=self._cancel_delete),
+                ft.TextButton("Delete", on_click=self._confirm_delete),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self.drawer = ft.NavigationDrawer(
+            controls=[
+                ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Text("Wake on LAN", size=22, weight=ft.FontWeight.BOLD),
+                            ft.Row(
+                                controls=[
+                                    ft.Text(f"v{VERSION}", size=14, color=ft.Colors.GREY_500),
+                                    ft.Container(expand=True),
+                                    ft.Text("(c) IntelOut", size=14, color=ft.Colors.GREY_500),
+                                ],
+                                alignment=ft.MainAxisAlignment.START,
+                            ),
+                        ],
+                        spacing=4,
+                    ),
+                    padding=Padding.symmetric(vertical=24, horizontal=20),
+                ),
+                ft.Divider(height=1),
+                ft.Container(
+                    content=ft.Text(
+                        "Privacy Policy",
+                        size=14,
+                        weight=ft.FontWeight.W_600,
+                        color=ft.Colors.GREY_600,
+                    ),
+                    padding=Padding.symmetric(vertical=12, horizontal=20),
+                ),
+                ft.ListTile(
+                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
+                    title=ft.Text("Privacy Policy (RU)"),
+                    on_click=lambda _: self.page.run_task(
+                        ft.UrlLauncher().launch_url,
+                        "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY_RU.md"
+                    ),
+                ),
+                ft.ListTile(
+                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
+                    title=ft.Text("Privacy Policy (EN)"),
+                    on_click=lambda _: self.page.run_task(
+                        ft.UrlLauncher().launch_url,
+                        "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY.md"
+                    ),
+                ),
+                ft.Container(
+                    content=ft.Text(
+                        "User Agreement",
+                        size=14,
+                        weight=ft.FontWeight.W_600,
+                        color=ft.Colors.GREY_600,
+                    ),
+                    padding=Padding.symmetric(vertical=12, horizontal=20),
+                ),
+                ft.ListTile(
+                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
+                    title=ft.Text("User Agreement (RU)"),
+                    on_click=lambda _: self.page.run_task(
+                        ft.UrlLauncher().launch_url,
+                        "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT_RU.md"
+                    ),
+                ),
+                ft.ListTile(
+                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
+                    title=ft.Text("User Agreement (EN)"),
+                    on_click=lambda _: self.page.run_task(
+                        ft.UrlLauncher().launch_url,
+                        "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT.md"
+                    ),
+                ),
+            ],
+        )
+        self.page.drawer = self.drawer
+
+    def _on_theme_toggle(self, e):
+        self._is_dark = not self._is_dark
+        theme_key = "dark" if self._is_dark else "light"
+        self.page.theme_mode = ft.ThemeMode.DARK if self._is_dark else ft.ThemeMode.LIGHT
+        appbar = self.page.appbar
+        if appbar and appbar.actions:
+            appbar.actions[0].icon = ft.Icons.DARK_MODE if self._is_dark else ft.Icons.LIGHT_MODE
+        _save_settings({"theme_mode": theme_key})
+        self.page.update()
+
+    def _validate_mac_field(self, e):
+        mac = self.mac_input.value.strip() if self.mac_input.value else ""
+        if mac and not _validate_mac(mac):
+            self.mac_input.error_text = "Invalid MAC format"
+        else:
+            self.mac_input.error_text = None
+        self.page.update()
+
+    def open_settings(self):
+        self.page.show_dialog(self.settings_dialog)
+
+    def close_settings(self):
+        self.settings_dialog.open = False
+        self.page.update()
+
+    async def open_drawer(self):
+        await self.page.show_drawer()
 
     # --- helpers ----------------------------------------------------------
 
@@ -226,7 +419,8 @@ class WolApp:
                 await self._send_from_list(_mac)
 
             def _on_delete(_, _idx=i):
-                self._delete_device(_idx)
+                self._pending_delete_index = _idx
+                self.page.show_dialog(self.confirm_delete_dialog)
 
             card = ft.Card(
                 content=ft.Container(
@@ -271,10 +465,27 @@ class WolApp:
                     alignment=ft.Alignment(1.0, 0.0),
                 ),
                 dismiss_direction=ft.DismissDirection.END_TO_START,
-                on_dismiss=lambda _, _idx=i: self._delete_device(_idx),
+                on_dismiss=lambda _, _idx=i: self._on_dismiss_delete(_idx),
             )
             self.device_cards.controls.append(dismissible)
         self.empty_state.visible = len(devices) == 0
+        self.page.update()
+
+    def _on_dismiss_delete(self, index: int):
+        self._pending_delete_index = index
+        self.page.show_dialog(self.confirm_delete_dialog)
+
+    def _confirm_delete(self, e):
+        self.confirm_delete_dialog.open = False
+        if self._pending_delete_index is not None:
+            self._delete_device(self._pending_delete_index)
+            self._pending_delete_index = None
+        self.page.update()
+
+    def _cancel_delete(self, e):
+        self.confirm_delete_dialog.open = False
+        self._pending_delete_index = None
+        self.refresh_device_list()
         self.page.update()
 
     def _delete_device(self, index: int):
@@ -313,18 +524,24 @@ class WolApp:
 
     async def send_wol_action(self):
         """Validate inputs, show loading, send WOL, then hide loading and show result."""
+        if self._sending:
+            return
         try:
             mac, ip, port = self.validate_inputs()
         except ValueError as e:
             self.show_snack(str(e), error=True)
             return
 
+        self._sending = True
+        self.wake_button.disabled = True
         self.loading.visible = True
         self.page.update()
 
         msg = await _send_wol(mac, ip, port)
 
         self.loading.visible = False
+        self.wake_button.disabled = False
+        self._sending = False
         if "Error" in msg or "error" in msg:
             self.show_snack(msg, error=True)
         else:
@@ -360,6 +577,7 @@ class WolApp:
     def on_clear_click(self, e):
         """Event handler for the Clear button."""
         self.mac_input.value = ""
+        self.mac_input.error_text = None
         self.ip_input.value = "255.255.255.255"
         self.port_input.value = "9"
         self.name_input.value = ""
@@ -387,18 +605,6 @@ class WolApp:
                                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                         ),
                                         ft.Text(
-                                            "Network",
-                                            size=20,
-                                            weight=ft.FontWeight.W_600,
-                                        ),
-                                        self.ip_input,
-                                        ft.Row(
-                                            controls=[
-                                                self.port_input,
-                                                ft.Container(expand=True),
-                                            ]
-                                        ),
-                                        ft.Text(
                                             "Save device",
                                             size=20,
                                             weight=ft.FontWeight.W_600,
@@ -417,43 +623,21 @@ class WolApp:
                                         ),
                                         ft.Divider(height=20),
                                         ft.Container(
-                                            content=ft.Button(
-                                                content=ft.Row(
-                                                    controls=[
-                                                        ft.Icon(
-                                                            ft.Icons.POWER_SETTINGS_NEW,
-                                                            size=24,
-                                                        ),
-                                                        ft.Text("Wake Up", size=18),
-                                                    ],
-                                                    alignment=ft.MainAxisAlignment.CENTER,
-                                                ),
-                                                style=ft.ButtonStyle(
-                                                    padding=Padding.symmetric(
-                                                        horizontal=30, vertical=14
-                                                    ),
-                                                    shape=ft.RoundedRectangleBorder(
-                                                        radius=12
-                                                    ),
-                                                ),
-                                                expand=True,
-                                                on_click=self.on_wake_click,
-                                            ),
+                                            content=self.wake_button,
                                             padding=Padding.symmetric(
                                                 horizontal=8
                                             ),
                                         ),
                                         self.loading,
-                                        ft.Container(
-                                            content=ft.OutlinedButton(
-                                                "Clear fields",
-                                                icon=ft.Icons.CLEAR_ALL,
-                                                on_click=self.on_clear_click,
-                                                expand=True,
-                                            ),
-                                            padding=Padding.symmetric(
-                                                horizontal=8
-                                            ),
+                                        ft.Row(
+                                            controls=[
+                                                ft.OutlinedButton(
+                                                    "Clear fields",
+                                                    icon=ft.Icons.CLEAR_ALL,
+                                                    on_click=self.on_clear_click,
+                                                ),
+                                            ],
+                                            alignment=ft.MainAxisAlignment.CENTER,
                                         ),
                                     ],
                                     spacing=12,
@@ -475,15 +659,6 @@ class WolApp:
                                 ),
                                 padding=Padding(left=20, top=0, right=20, bottom=20),
                             ),
-                            ft.Container(
-                                content=ft.Text(
-                                    f"v{VERSION}",
-                                    size=12,
-                                    color=ft.Colors.GREY_500,
-                                    text_align=ft.TextAlign.CENTER,
-                                ),
-                                padding=Padding.symmetric(vertical=10, horizontal=20),
-                            ),
                         ],
                         spacing=0,
                         scroll=ft.ScrollMode.AUTO,
@@ -497,8 +672,15 @@ class WolApp:
 
 def main(page: ft.Page):
     """Application entry point."""
+    if sys.platform == "win32":
+        icon_path = os.path.abspath("icon.ico")
+    else:
+        icon_path = os.path.abspath("icon.png")
+    page.window.icon = icon_path
+    page.window.width = 360
+    page.window.height = 760
     WolApp(page)
 
 
 if __name__ == "__main__":
-    ft.run(main=main)
+    ft.run(main=main, name=f"Wake on LAN v{VERSION}")

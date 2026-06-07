@@ -2,6 +2,7 @@
 
 import json
 import socket
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -397,7 +398,10 @@ class TestWolAppInit:
     def test_page_title_and_padding(self):
         page = _make_mock_page()
         WolApp(page)
-        assert page.title == "Wake on LAN"
+        if sys.platform == "win32":
+            assert page.title == "Wake on LAN v0.4.0"
+        else:
+            assert page.title == "Wake on LAN"
         assert page.padding == 0
 
     def test_page_scroll(self):
