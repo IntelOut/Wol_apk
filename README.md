@@ -46,7 +46,8 @@ APK появится в `build/apk/`.
 
 - **App title**: `Wake on LAN` (≤30 символов)
 - **Short description (≤80 символов)**: `Wake devices on your local network with one tap`
-- **Privacy Policy**: см. [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
+- **Privacy Policy**: см. [PRIVACY_POLICY.md](PRIVACY_POLICY.md) / [PRIVACY_POLICY_RU.md](PRIVACY_POLICY_RU.md)
+- **User Agreement**: см. [USER_AGREEMENT.md](USER_AGREEMENT.md) / [USER_AGREEMENT_RU.md](USER_AGREEMENT_RU.md)
 - **Data Safety**: Укажите, что приложение передаёт MAC-адреса через UDP (локальная сеть) и хранит данные локально с шифрованием
 - **Permissions**: `INTERNET`, `ACCESS_NETWORK_STATE` (добавляются автоматически)
 - **Content Rating**: Для всех (Everyone)

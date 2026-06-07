@@ -20,7 +20,7 @@ from flet.security import decrypt, encrypt
 
 DATA_FILE = "devices.json"
 CRYPT_KEY = "wol-app-secret-key-32bytes"
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 
 
 def _validate_mac(mac: str) -> bool:
