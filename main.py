@@ -416,38 +416,44 @@ class WolApp:
                                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                         ),
                                         ft.Divider(height=20),
-                                        ft.Button(
-                                            content=ft.Row(
-                                                controls=[
-                                                    ft.Icon(
-                                                        ft.Icons.POWER_SETTINGS_NEW,
-                                                        size=24,
+                                        ft.Container(
+                                            content=ft.Button(
+                                                content=ft.Row(
+                                                    controls=[
+                                                        ft.Icon(
+                                                            ft.Icons.POWER_SETTINGS_NEW,
+                                                            size=24,
+                                                        ),
+                                                        ft.Text("Wake Up", size=18),
+                                                    ],
+                                                    alignment=ft.MainAxisAlignment.CENTER,
+                                                ),
+                                                style=ft.ButtonStyle(
+                                                    padding=Padding.symmetric(
+                                                        horizontal=30, vertical=14
                                                     ),
-                                                    ft.Text("Wake Up", size=18),
-                                                ],
-                                                alignment=ft.MainAxisAlignment.CENTER,
-                                            ),
-                                            style=ft.ButtonStyle(
-                                                padding=Padding.symmetric(
-                                                    horizontal=30, vertical=14
+                                                    shape=ft.RoundedRectangleBorder(
+                                                        radius=12
+                                                    ),
                                                 ),
-                                                shape=ft.RoundedRectangleBorder(
-                                                    radius=12
-                                                ),
+                                                expand=True,
+                                                on_click=self.on_wake_click,
                                             ),
-                                            width=280,
-                                            on_click=self.on_wake_click,
+                                            padding=Padding.symmetric(
+                                                horizontal=8
+                                            ),
                                         ),
                                         self.loading,
-                                        ft.Row(
-                                            controls=[
-                                                ft.OutlinedButton(
-                                                    "Clear fields",
-                                                    icon=ft.Icons.CLEAR_ALL,
-                                                    on_click=self.on_clear_click,
-                                                ),
-                                            ],
-                                            alignment=ft.MainAxisAlignment.CENTER,
+                                        ft.Container(
+                                            content=ft.OutlinedButton(
+                                                "Clear fields",
+                                                icon=ft.Icons.CLEAR_ALL,
+                                                on_click=self.on_clear_click,
+                                                expand=True,
+                                            ),
+                                            padding=Padding.symmetric(
+                                                horizontal=8
+                                            ),
                                         ),
                                     ],
                                     spacing=12,

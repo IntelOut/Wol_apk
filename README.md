@@ -32,7 +32,8 @@ flet build apk \
   --build-version 0.3.0 \
   --build-number 1 \
   --org com.yourorg.wol \
-  --product wol-app
+  --product wol-app \
+  --orientation portrait
 ```
 APK появится в `build/apk/`.
 
@@ -43,10 +44,14 @@ APK появится в `build/apk/`.
 
 ## Google Play
 
+- **App title**: `Wake on LAN` (≤30 символов)
+- **Short description (≤80 символов)**: `Wake devices on your local network with one tap`
 - **Privacy Policy**: см. [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
 - **Data Safety**: Укажите, что приложение передаёт MAC-адреса через UDP (локальная сеть) и хранит данные локально с шифрованием
 - **Permissions**: `INTERNET`, `ACCESS_NETWORK_STATE` (добавляются автоматически)
 - **Content Rating**: Для всех (Everyone)
+- **Feature graphic**: `feature_graphic.png` (1024×500) — сгенерирован скриптом `generate_feature_graphic.py`
+- **Screenshots**: загрузите 2–8 скриншотов 9:16 (портрет) в Google Play Console
 
 ---
 
