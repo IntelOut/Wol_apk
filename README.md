@@ -97,11 +97,9 @@ pip install flet cryptography
 ```bash
 pip install flet cryptography
 flet build apk \
-  --icon assets/icon.png \
   --build-version 0.6.0 \
   --build-number 1 \
-  --org com.intelout.wol \
-  --orientation portrait
+  --org com.intelout.wol
 ```
 APK появится в `build/apk/`.
 
