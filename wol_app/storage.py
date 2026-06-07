@@ -23,6 +23,15 @@ _logger = logging.getLogger(__name__)
 
 
 def set_data_dir(path: str) -> None:
+    """Set the application data directory and ensure it exists.
+
+    All subsequent file I/O (devices, settings, encryption key) will
+    be rooted at *path*.  The cached encryption key is invalidated
+    so it is re-read from the new location on next access.
+
+    Args:
+        path: Absolute path to the data directory.
+    """
     global DATA_DIR
     DATA_DIR = path
     os.makedirs(path, exist_ok=True)
@@ -30,6 +39,16 @@ def set_data_dir(path: str) -> None:
 
 
 def migrate_from_cwd(target_dir: str) -> None:
+    """Copy existing data files from the working directory to *target_dir*.
+
+    Migration runs only once — after a successful copy the sentinel file
+    ``.migrated`` is written to prevent re-migration on subsequent starts.
+    If any individual file copy fails the sentinel is **not** written so
+    the migration is retried on the next launch.
+
+    Args:
+        target_dir: The destination directory for migrated files.
+    """
     _migration_sentinel = ".migrated"
     sentinel = os.path.join(target_dir, _migration_sentinel)
     if os.path.exists(sentinel):
@@ -56,14 +75,17 @@ def migrate_from_cwd(target_dir: str) -> None:
 
 
 def _key_path() -> str:
+    """Full path to the encryption key file."""
     return os.path.join(DATA_DIR, KEY_FILE)
 
 
 def _data_path() -> str:
+    """Full path to the devices data file."""
     return os.path.join(DATA_DIR, DATA_FILE)
 
 
 def _settings_path() -> str:
+    """Full path to the settings file."""
     return os.path.join(DATA_DIR, SETTINGS_FILE)
 
 
@@ -97,6 +119,13 @@ def _decrypt_data(ciphertext: str) -> str:
 
 
 def load_devices() -> list:
+    """Load the saved device list from encrypted storage.
+
+    Returns:
+        A list of device dicts (keys ``name``, ``mac``, ``ip``, ``port``).
+        Returns an empty list if the file does not exist or cannot be
+        decrypted.
+    """
     dp = _data_path()
     if not os.path.exists(dp):
         return []
@@ -110,6 +139,11 @@ def load_devices() -> list:
 
 
 def save_devices(devices: list) -> None:
+    """Persist the device list to encrypted storage.
+
+    Args:
+        devices: A list of device dicts.
+    """
     plain = json.dumps(devices, ensure_ascii=False)
     encrypted = _encrypt_data(plain)
     with open(_data_path(), "w", encoding="utf-8") as f:
@@ -117,6 +151,12 @@ def save_devices(devices: list) -> None:
 
 
 def load_settings() -> dict:
+    """Load application settings (theme, language, …) from encrypted storage.
+
+    Returns:
+        A dict of settings. Returns an empty dict if the file does not
+        exist or cannot be decrypted.
+    """
     sp = _settings_path()
     if not os.path.exists(sp):
         return {}
@@ -130,6 +170,11 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict) -> None:
+    """Persist application settings to encrypted storage.
+
+    Args:
+        settings: A dict of settings (e.g. ``{"theme_mode": "dark"}``).
+    """
     plain = json.dumps(settings, ensure_ascii=False)
     encrypted = _encrypt_data(plain)
     with open(_settings_path(), "w", encoding="utf-8") as f:

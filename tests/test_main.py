@@ -1,4 +1,33 @@
-"""Tests for the Wake-on-LAN Flet application."""
+"""Tests for the Wake-on-LAN Flet application.
+
+Test suites are organised into three tiers:
+
+1. **Unit tests** — pure logic functions from :mod:`wol_app.protocol`
+   (``validate_mac``, ``validate_ip``, ``auto_format_mac``,
+   ``mac_to_bytes``, ``build_magic_packet``, ``send_wol``) and
+   :mod:`wol_app.storage` (save/load round-trips, encryption,
+   corruption handling).
+
+2. **WolApp class tests** — each test patches ``ft.Page`` with a
+   :class:`unittest.mock.MagicMock` and redirects storage files to
+   a :class:`pathlib.Path` temporary directory via :func:`_patch_storage`.
+
+3. **Integration tests** — end-to-end flows that combine protocol
+   functions with mocked sockets and (optionally) real storage I/O.
+
+Fixtures
+--------
+_tmp_path_ (built-in pytest):
+    Each test receives an isolated temporary directory.
+
+Helper functions
+----------------
+_make_mock_page_:
+    Returns a ``MagicMock`` configured as a minimal ``ft.Page``.
+
+_patch_storage_ / _unpatch_storage_:
+    Redirect file I/O to a temporary directory and restore afterwards.
+"""
 
 import json
 import os

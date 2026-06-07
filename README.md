@@ -1,20 +1,23 @@
 # Wake-on-LAN Flet приложение
 
-Мобильное приложение для отправки Wake-on-LAN magic-пакетов через UDP broadcast. Поддерживает сохранение устройств, тёмную/светлую тему, редактирование и per-device IP/порт.
+Мобильное приложение для отправки Wake-on-LAN magic-пакетов через UDP broadcast.
+Поддерживает сохранение устройств с шифрованием, тёмную/светлую тему, редактирование и per-device IP/порт.
+
+[![Test](https://github.com/IntelOut/Wol_apk/actions/workflows/test.yml/badge.svg)](https://github.com/IntelOut/Wol_apk/actions/workflows/test.yml)
 
 ---
 
 ## Функции
 
 - Отправка WOL magic packet по UDP broadcast
-- Сохранение устройств в зашифрованный список (AES-256 через PBKDF2)
+- Сохранение устройств в зашифрованный список (AES-256 через PBKDF2 + Fernet)
 - Редактирование и удаление устройств (свайп / кнопка)
-- Автоматическая подстановка MAC, IP и порта при клике на устройство
-- Per-device настройки IP и порта
-- Валидация MAC-адреса в реальном времени, обработка ошибок сети
+- Per-device IP и порт, автоматическая подстановка при клике
+- Валидация MAC-адреса в реальном времени, автоформатирование
 - Тёмная/светлая тема (переключатель в AppBar)
 - ProgressRing + "Sending..." при отправке, Empty State для пустого списка
-- Адаптивно под Android и Windows
+- Навигационный drawer с Privacy Policy и User Agreement
+- Адаптивно под Android (APK) и Windows
 
 ---
 
@@ -23,20 +26,23 @@
 ```
 ├── main.py                  # Точка входа
 ├── wol_app/
-│   ├── __init__.py
-│   ├── protocol.py          # WOL-функции (MAC, magic packet, отправка)
-│   ├── storage.py           # Шифрование, загрузка/сохранение данных
-│   └── ui.py                # Flet UI (WolApp)
+│   ├── __init__.py           # Пакет
+│   ├── protocol.py           # WOL-функции (MAC, magic packet, отправка)
+│   ├── storage.py            # Шифрование, загрузка/сохранение данных, миграция
+│   └── ui.py                 # Flet UI (WolApp)
 ├── assets/
-│   ├── icon.png             # Иконка приложения (Android)
-│   ├── icon.ico             # Иконка приложения (Windows)
-│   ├── icon256.png          # Иконка 256×256
-│   └── feature_graphic.png  # Графика для Google Play (1024×500)
+│   ├── icon.png              # Иконка приложения (Android)
+│   ├── icon.ico              # Иконка приложения (Windows)
+│   ├── icon256.png           # Иконка 256×256
+│   └── feature_graphic.png   # Графика для Google Play (1024×500)
 ├── tests/
-│   └── test_main.py         # 79 тестов (pytest)
+│   └── test_main.py          # 100 тестов (pytest + pytest-asyncio)
+├── .github/workflows/test.yml
 ├── requirements.txt
 ├── requirements-dev.txt
-└── .github/workflows/test.yml
+├── pyproject.toml
+├── AGENTS.md
+└── README.md
 ```
 
 ---
@@ -44,17 +50,17 @@
 ## Запуск на Android
 
 ### 1. Через Pydroid 3
-```
-pip install flet
+```bash
+pip install flet cryptography
 ```
 Открой `main.py` и нажми **Run**.
 
 ### 2. Сборка APK (рекомендуется)
 ```bash
-pip install flet
+pip install flet cryptography
 flet build apk \
   --icon assets/icon.png \
-  --build-version 0.5.1 \
+  --build-version 0.5.2 \
   --build-number 1 \
   --org com.intelout.wol \
   --orientation portrait
@@ -73,13 +79,15 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Данные сохраняются в `~/.wol_app_data/` (`%USERPROFILE%\.wol_app_data\`).
+
 ---
 
 ## Тестирование
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ --cov=wol_app -v
+PYTHONPATH=. pytest tests/ --cov=wol_app -v
 ```
 
 ---
@@ -98,4 +106,4 @@ pytest tests/ --cov=wol_app -v
 
 ---
 
-**Зависимости:** `pip install -r requirements.txt`
+**Зависимости:** `pip install -r requirements.txt` (flet, cryptography)

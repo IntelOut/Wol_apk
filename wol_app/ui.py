@@ -281,6 +281,18 @@ class WolApp:
         await self.page.show_drawer()
 
     def _drawer_links(self, _section: str, items: list[tuple[str, str]]) -> list[ft.ListTile]:
+        """Build a list of ``ListTile`` controls that open external URLs.
+
+        Each tile displays a document title and opens the corresponding
+        URL when tapped.
+
+        Args:
+            _section: Section label (unused, kept for consistency).
+            items: Pairs of ``(display_title, url)``.
+
+        Returns:
+            A list of ``ft.ListTile`` controls.
+        """
         return [
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
@@ -291,6 +303,12 @@ class WolApp:
         ]
 
     def _navigate_to_url(self, url: str, e) -> None:
+        """Open an external URL via the system browser.
+
+        Args:
+            url: The URL to open.
+            e: The Flet click event (ignored).
+        """
         self.page.run_task(ft.UrlLauncher().launch_url, url)
 
     # --- helpers ----------------------------------------------------------
@@ -320,15 +338,41 @@ class WolApp:
         self.page.show_dialog(self.confirm_delete_dialog)
 
     def _on_edit(self, idx: int, e) -> None:
+        """Callback wrapper that populates the form with device *idx*.
+
+        Args:
+            idx: Index of the device to edit.
+            e: The Flet click event (ignored).
+        """
         self._start_edit(idx)
 
     def _on_delete(self, idx: int, e) -> None:
+        """Callback wrapper that shows the delete confirmation dialog.
+
+        Args:
+            idx: Index of the device to delete.
+            e: The Flet click event (ignored).
+        """
         self._prompt_delete(idx)
 
     def _on_device_click(self, mac: str, ip: str, port: str, e) -> None:
+        """Callback wrapper that fills the form and sends a WOL packet.
+
+        Args:
+            mac:  Target MAC address.
+            ip:   Target IP or broadcast address.
+            port: Destination UDP port.
+            e: The Flet click event (ignored).
+        """
         self._run_send(mac, ip, port)
 
     def _on_dismiss_wrapper(self, idx: int, e) -> None:
+        """Callback wrapper that handles a swipe-to-dismiss gesture.
+
+        Args:
+            idx: Index of the dismissed device.
+            e: The Flet dismiss event (ignored).
+        """
         self._on_dismiss_delete(idx)
 
     def refresh_device_list(self):

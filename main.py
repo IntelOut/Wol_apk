@@ -13,6 +13,15 @@ from wol_app.ui import WolApp
 
 
 def main(page: ft.Page):
+    """Configure and launch the Wake-on-LAN application.
+
+    Sets up the platform-appropriate data directory (``~/.wol_app_data``
+    on desktop, app-private on Android), migrates existing files from the
+    old CWD location if present, then builds the full UI.
+
+    Args:
+        page: The root Flet page provided by the framework.
+    """
     data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
     migrate_from_cwd(data_dir)
     set_data_dir(data_dir)
