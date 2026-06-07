@@ -181,10 +181,8 @@ cython_debug/
 .cursorindexingignore
 .kilo/
 
-# Runtime data files
-devices.json
-settings.json
-.crypt_key
+# Application data directory (user home, platform-specific)
+.wol_app_data/
 
 # Production binary icons (generated from assets/icon.png)
 icon.ico
