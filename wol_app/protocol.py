@@ -1,102 +1,55 @@
-"""Wake-on-LAN protocol implementation.
-
-Provides functions for MAC address validation, magic packet construction,
-and asynchronous UDP broadcast delivery of Wake-on-LAN packets.
-"""
-
 import asyncio
+import ipaddress
 import re
 import socket
 
 
 def validate_mac(mac: str) -> bool:
-    """Check whether a string is a valid MAC address in XX:XX:XX:XX:XX:XX format.
-
-    Args:
-        mac: The MAC address string to validate. Leading/trailing whitespace
-             is tolerated but separators must be colons.
-
-    Returns:
-        True if the format is correct, False otherwise.
-    """
-    pattern = r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
-    return bool(re.match(pattern, mac.strip()))
+    stripped = mac.strip()
+    pattern = r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$"
+    return bool(re.match(pattern, stripped))
 
 
 def mac_to_bytes(mac: str) -> bytes:
-    """Convert a colon-separated MAC address string to 6 raw bytes.
-
-    Args:
-        mac: MAC address in XX:XX:XX:XX:XX:XX format (colons and whitespace
-             are stripped automatically).
-
-    Returns:
-        6 bytes representing the MAC address.
-    """
-    return bytes.fromhex(mac.strip().replace(":", ""))
+    return bytes.fromhex(mac.strip().replace(":", "").replace("-", ""))
 
 
 def auto_format_mac(raw: str) -> str:
-    """Insert colons into a bare 12-hex-character MAC string.
-
-    Args:
-        raw: A string that may contain a MAC without separators.
-
-    Returns:
-        The formatted MAC if applicable, or the original string otherwise.
-    """
-    if raw and ":" not in raw and len(raw) == 12 and re.match(r"^[0-9A-Fa-f]{12}$", raw):
-        return ":".join(raw[i : i + 2] for i in range(0, 12, 2))
+    cleaned = raw.strip().replace("-", "").replace(":", "").strip()
+    if not cleaned:
+        return raw
+    if len(cleaned) == 12 and re.match(r"^[0-9A-Fa-f]{12}$", cleaned):
+        return ":".join(cleaned[i : i + 2] for i in range(0, 12, 2))
     return raw
 
 
+def normalize_mac(mac: str) -> str:
+    return ":".join(
+        p.upper() for p in mac.strip().replace("-", ":").split(":") if p
+    )
+
+
 def validate_ip(ip: str) -> bool:
-    """Check whether a string is a valid IPv4 address.
-
-    Args:
-        ip: The IP address string to validate.
-
-    Returns:
-        True if the format is correct, False otherwise.
-    """
-    pattern = r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$"
-    m = re.match(pattern, ip.strip())
-    if not m:
-        return False
-    return all(0 <= int(g) <= 255 for g in m.groups())
+    try:
+        ipaddress.IPv4Address(ip.strip())
+        return True
+    except ValueError:
+        try:
+            parts = ip.strip().split(".")
+            if len(parts) != 4:
+                return False
+            cleaned = ".".join(str(int(p)) for p in parts)
+            ipaddress.IPv4Address(cleaned)
+            return True
+        except ValueError:
+            return False
 
 
 def build_magic_packet(mac: bytes) -> bytes:
-    """Build a Wake-on-LAN magic packet.
-
-    The packet consists of 6 bytes of 0xFF followed by the target MAC
-    address repeated 16 times (102 bytes total).
-
-    Args:
-        mac: Exactly 6 bytes of the target MAC address.
-
-    Returns:
-        A 102-byte magic packet ready for UDP transmission.
-    """
     return b"\xff" * 6 + mac * 16
 
 
 async def send_wol(mac_address: str, ip: str, port: int) -> tuple[bool, str]:
-    """Send a Wake-on-LAN magic packet via UDP broadcast.
-
-    The packet is constructed from the given MAC and delivered to the
-    specified IP and port.  The actual socket I/O runs in a thread-pool
-    executor so the caller is not blocked.
-
-    Args:
-        mac_address: Target MAC in XX:XX:XX:XX:XX:XX format.
-        ip:          Destination IP or broadcast address (e.g. 255.255.255.255).
-        port:        Destination UDP port (typically 7 or 9).
-
-    Returns:
-        A ``(success, message)`` tuple where ``success`` is True on
-        successful packet delivery.
-    """
     mac_bytes = mac_to_bytes(mac_address)
     packet = build_magic_packet(mac_bytes)
 

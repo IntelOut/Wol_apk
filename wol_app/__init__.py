@@ -1,5 +1,6 @@
-"""Wake-on-LAN application package.
+"""Wake-on-LAN application package."""
 
-Provides the UI, protocol logic, and encrypted storage for
-sending Wake-on-LAN magic packets and managing device lists.
-"""
+from wol_app.config import VERSION
+from wol_app.models import Device
+
+__all__ = ["VERSION", "Device"]

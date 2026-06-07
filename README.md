@@ -27,16 +27,22 @@
 ├── main.py                  # Точка входа
 ├── wol_app/
 │   ├── __init__.py           # Пакет
+│   ├── config.py             # Константы, версия, ссылки на политики
+│   ├── models.py             # Device dataclass
 │   ├── protocol.py           # WOL-функции (MAC, magic packet, отправка)
 │   ├── storage.py            # Шифрование, загрузка/сохранение данных, миграция
-│   └── ui.py                 # Flet UI (WolApp)
+│   └── ui/
+│       ├── __init__.py       # Re-export WolApp
+│       ├── app.py            # WolApp — основной класс UI
+│       ├── widgets.py        # Переиспользуемые виджеты
+│       └── dialogs.py        # Диалоги
 ├── assets/
 │   ├── icon.png              # Иконка приложения (Android)
 │   ├── icon.ico              # Иконка приложения (Windows)
 │   ├── icon256.png           # Иконка 256×256
 │   └── feature_graphic.png   # Графика для Google Play (1024×500)
 ├── tests/
-│   └── test_main.py          # 100 тестов (pytest + pytest-asyncio)
+│   └── test_main.py          # 131 тест (pytest + pytest-asyncio)
 ├── .github/workflows/test.yml
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -60,7 +66,7 @@ pip install flet cryptography
 pip install flet cryptography
 flet build apk \
   --icon assets/icon.png \
-  --build-version 0.5.2 \
+  --build-version 0.6.0 \
   --build-number 1 \
   --org com.intelout.wol \
   --orientation portrait

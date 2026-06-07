@@ -8,7 +8,8 @@ import sys
 
 import flet as ft
 
-from wol_app.storage import VERSION, migrate_from_cwd, set_data_dir
+from wol_app.config import VERSION
+from wol_app.storage import migrate_from_cwd, set_data_dir
 from wol_app.ui import WolApp
 
 
