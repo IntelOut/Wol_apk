@@ -32,4 +32,4 @@ jobs:
           pylint main.py wol_app/ tests/test_main.py
       - name: Run tests
         run: |
-          pytest tests/ --cov=wol_app --cov-report=term-missing -v
+          PYTHONPATH=. pytest tests/ --cov=wol_app --cov-report=term-missing -v
