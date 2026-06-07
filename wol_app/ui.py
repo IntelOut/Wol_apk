@@ -6,10 +6,9 @@ separate from the WOL protocol and storage logic.
 """
 
 import sys
+from functools import partial
 
 import flet as ft
-from flet.controls.margin import Margin
-from flet.controls.padding import Padding
 
 from wol_app.protocol import auto_format_mac, send_wol, validate_ip, validate_mac
 from wol_app.storage import VERSION, load_devices, load_settings, save_devices, save_settings
@@ -124,7 +123,7 @@ class WolApp:
             text_size=16,
             expand=True,
         )
-        self.device_cards = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO)
+        self.device_cards = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO)
         self.empty_state = ft.Container(
             content=ft.Column(
                 controls=[
@@ -150,7 +149,7 @@ class WolApp:
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=8,
             ),
-            padding=Padding.symmetric(vertical=24, horizontal=20),
+            padding=ft.Padding.symmetric(vertical=24, horizontal=20),
         )
         self.loading = ft.ProgressRing(width=24, height=24, visible=False)
         self.sending_label = ft.Text("Sending...", size=14, color=ft.Colors.GREY_500, visible=False)
@@ -164,7 +163,7 @@ class WolApp:
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
             style=ft.ButtonStyle(
-                padding=Padding.symmetric(horizontal=30, vertical=10),
+                padding=ft.Padding.symmetric(horizontal=30, vertical=10),
                 shape=ft.RoundedRectangleBorder(radius=12),
             ),
             expand=True,
@@ -192,7 +191,7 @@ class WolApp:
                                     width=64,
                                     height=64,
                                 ),
-                                padding=Padding(left=0, top=0, right=0, bottom=8),
+                                padding=ft.Padding(left=0, top=0, right=0, bottom=8),
                             ),
                             ft.Text("Wake on LAN", size=22, weight=ft.FontWeight.BOLD),
                             ft.Row(
@@ -207,53 +206,29 @@ class WolApp:
                         spacing=4,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
-                    padding=Padding.symmetric(vertical=24, horizontal=20),
+                    padding=ft.Padding.symmetric(vertical=24, horizontal=20),
                 ),
                 ft.Divider(height=1),
                 ft.Container(
                     content=ft.Text(
                         "Privacy Policy", size=14, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_600
                     ),
-                    padding=Padding.symmetric(vertical=12, horizontal=20),
+                    padding=ft.Padding.symmetric(vertical=12, horizontal=20),
                 ),
-                ft.ListTile(
-                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
-                    title=ft.Text("Privacy Policy (RU)"),
-                    on_click=lambda _: self.page.run_task(
-                        ft.UrlLauncher().launch_url,
-                        "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY_RU.md"
-                    ),
-                ),
-                ft.ListTile(
-                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
-                    title=ft.Text("Privacy Policy (EN)"),
-                    on_click=lambda _: self.page.run_task(
-                        ft.UrlLauncher().launch_url,
-                        "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY.md"
-                    ),
-                ),
+                *self._drawer_links("Privacy Policy", [
+                    ("Privacy Policy (RU)", "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY_RU.md"),
+                    ("Privacy Policy (EN)", "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY.md"),
+                ]),
                 ft.Container(
                     content=ft.Text(
                         "User Agreement", size=14, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_600
                     ),
-                    padding=Padding.symmetric(vertical=12, horizontal=20),
+                    padding=ft.Padding.symmetric(vertical=12, horizontal=20),
                 ),
-                ft.ListTile(
-                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
-                    title=ft.Text("User Agreement (RU)"),
-                    on_click=lambda _: self.page.run_task(
-                        ft.UrlLauncher().launch_url,
-                        "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT_RU.md"
-                    ),
-                ),
-                ft.ListTile(
-                    leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
-                    title=ft.Text("User Agreement (EN)"),
-                    on_click=lambda _: self.page.run_task(
-                        ft.UrlLauncher().launch_url,
-                        "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT.md"
-                    ),
-                ),
+                *self._drawer_links("User Agreement", [
+                    ("User Agreement (RU)", "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT_RU.md"),
+                    ("User Agreement (EN)", "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT.md"),
+                ]),
             ],
         )
         self.page.drawer = self.drawer
@@ -305,6 +280,19 @@ class WolApp:
         """Open the navigation drawer (privacy / user agreement links)."""
         await self.page.show_drawer()
 
+    def _drawer_links(self, _section: str, items: list[tuple[str, str]]) -> list[ft.ListTile]:
+        return [
+            ft.ListTile(
+                leading=ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
+                title=ft.Text(title),
+                on_click=partial(self._navigate_to_url, url),
+            )
+            for title, url in items
+        ]
+
+    def _navigate_to_url(self, url: str, e) -> None:
+        self.page.run_task(ft.UrlLauncher().launch_url, url)
+
     # --- helpers ----------------------------------------------------------
 
     def show_snack(self, message: str, error: bool = False):
@@ -331,6 +319,18 @@ class WolApp:
         self._pending_delete_index = index
         self.page.show_dialog(self.confirm_delete_dialog)
 
+    def _on_edit(self, idx: int, e) -> None:
+        self._start_edit(idx)
+
+    def _on_delete(self, idx: int, e) -> None:
+        self._prompt_delete(idx)
+
+    def _on_device_click(self, mac: str, ip: str, port: str, e) -> None:
+        self._run_send(mac, ip, port)
+
+    def _on_dismiss_wrapper(self, idx: int, e) -> None:
+        self._on_dismiss_delete(idx)
+
     def refresh_device_list(self):
         """Reload the device list from storage and rebuild the UI cards."""
         self.device_cards.controls.clear()
@@ -340,42 +340,58 @@ class WolApp:
             mac = dev.get("mac", "")
             dev_ip = dev.get("ip", "")
             dev_port = dev.get("port", "")
-            subtitle_parts = [mac]
+            subtitle = ft.Row(
+                controls=[ft.Text(mac, size=12, color=ft.Colors.GREY_600)],
+                wrap=True,
+                spacing=0,
+            )
             if dev_ip:
-                subtitle_parts.append(dev_ip)
+                subtitle.controls.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_500))
+                subtitle.controls.append(ft.Text(dev_ip, size=12, color=ft.Colors.GREY_600))
             if dev_port:
-                subtitle_parts.append(f"port {dev_port}")
-            subtitle = " | ".join(subtitle_parts) if len(subtitle_parts) > 1 else mac
+                subtitle.controls.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_500))
+                subtitle.controls.append(ft.Text(str(dev_port), size=12, color=ft.Colors.GREY_600))
 
             card = ft.Card(
                 content=ft.Container(
-                    content=ft.ListTile(
-                        leading=ft.Icon(ft.Icons.DEVICES, size=28),
-                        title=ft.Text(name, size=16, weight=ft.FontWeight.W_600),
-                        subtitle=ft.Text(subtitle, size=14, color=ft.Colors.GREY_600),
-                        trailing=ft.Row(
-                            controls=[
-                                ft.IconButton(
-                                    icon=ft.Icons.EDIT,
-                                    tooltip="Edit",
-                                    icon_size=24,
-                                    on_click=lambda _, _idx=i: self._start_edit(_idx),
-                                ),
-                                ft.IconButton(
-                                    icon=ft.Icons.DELETE_OUTLINE,
-                                    tooltip="Delete",
-                                    icon_size=28,
-                                    on_click=lambda _, _idx=i: self._prompt_delete(_idx),
-                                ),
-                            ],
-                            spacing=0,
-                        ),
-                        on_click=lambda _, _mac=mac, _ip=dev_ip, _port=dev_port: self._run_send(_mac, _ip, _port),
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.DEVICES, size=20),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(name, size=14, weight=ft.FontWeight.W_600),
+                                    subtitle,
+                                ],
+                                spacing=0,
+                                expand=True,
+                            ),
+                            ft.Row(
+                                controls=[
+                                    ft.IconButton(
+                                        icon=ft.Icons.EDIT,
+                                        tooltip="Edit",
+                                        icon_size=18,
+                                        on_click=partial(self._on_edit, i),
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.DELETE_OUTLINE,
+                                        tooltip="Delete",
+                                        icon_size=18,
+                                        on_click=partial(self._on_delete, i),
+                                    ),
+                                ],
+                                spacing=0,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                        ],
+                        spacing=4,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
-                    padding=Padding.symmetric(vertical=4, horizontal=4),
+                    padding=ft.Padding.symmetric(vertical=4, horizontal=6),
+                    on_click=partial(self._on_device_click, mac, dev_ip, dev_port),
                 ),
-                elevation=1.5,
-                margin=Margin.symmetric(vertical=2),
+                elevation=1,
+                margin=ft.Margin.symmetric(vertical=1),
             )
 
             dismissible = ft.Dismissible(
@@ -389,12 +405,12 @@ class WolApp:
                         alignment=ft.MainAxisAlignment.END,
                         spacing=8,
                     ),
-                    padding=Padding.symmetric(horizontal=24),
+                    padding=ft.Padding.symmetric(horizontal=24),
                     bgcolor=ft.Colors.RED_ACCENT_700,
                     alignment=ft.Alignment(1.0, 0.0),
                 ),
                 dismiss_direction=ft.DismissDirection.END_TO_START,
-                on_dismiss=lambda _, _idx=i: self._on_dismiss_delete(_idx),
+                on_dismiss=partial(self._on_dismiss_wrapper, i),
             )
             self.device_cards.controls.append(dismissible)
         self.empty_state.visible = len(devices) == 0
@@ -500,16 +516,13 @@ class WolApp:
         self.sending_label.visible = True
         self.page.update()
 
-        msg = await send_wol(mac, ip, port)
+        success, msg = await send_wol(mac, ip, port)
 
         self.loading.visible = False
         self.sending_label.visible = False
         self.wake_button.disabled = False
         self._sending = False
-        if "Error" in msg or "error" in msg:
-            self.show_snack(msg, error=True)
-        else:
-            self.show_snack(msg)
+        self.show_snack(msg, error=not success)
         self.page.update()
 
     async def on_wake_click(self, e):
@@ -620,7 +633,7 @@ class WolApp:
                                         ft.Divider(height=12),
                                         ft.Container(
                                             content=self.wake_button,
-                                            padding=Padding.symmetric(horizontal=8),
+                                            padding=ft.Padding.symmetric(horizontal=8),
                                         ),
                                         ft.Container(
                                             content=ft.Row(
@@ -631,7 +644,7 @@ class WolApp:
                                                 alignment=ft.MainAxisAlignment.CENTER,
                                                 spacing=8,
                                             ),
-                                            padding=Padding.symmetric(vertical=2),
+                                            padding=ft.Padding.symmetric(vertical=2),
                                         ),
                                         ft.Row(
                                             controls=[
@@ -646,7 +659,7 @@ class WolApp:
                                     ],
                                     spacing=6,
                                 ),
-                                padding=Padding.all(16),
+                                padding=ft.Padding.all(16),
                             ),
                             ft.Container(
                                 content=ft.Column(
@@ -657,7 +670,7 @@ class WolApp:
                                     ],
                                     spacing=4,
                                 ),
-                                padding=Padding(left=16, top=0, right=16, bottom=16),
+                                padding=ft.Padding(left=16, top=0, right=16, bottom=16),
                             ),
                         ],
                         spacing=0,

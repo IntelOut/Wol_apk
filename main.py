@@ -8,16 +8,14 @@ import sys
 
 import flet as ft
 
-from wol_app.storage import VERSION
+from wol_app.storage import VERSION, migrate_from_cwd, set_data_dir
 from wol_app.ui import WolApp
 
 
 def main(page: ft.Page):
-    """Configure and launch the Wake-on-LAN application.
-
-    Args:
-        page: The root Flet page provided by the framework.
-    """
+    data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
+    migrate_from_cwd(data_dir)
+    set_data_dir(data_dir)
     icon = "icon.ico" if sys.platform == "win32" else "icon.png"
     page.window.icon = os.path.abspath(os.path.join("assets", icon))
     page.window.width = 360

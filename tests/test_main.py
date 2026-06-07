@@ -251,9 +251,10 @@ class TestSendWol:
             mock_sock = MagicMock()
             mock_socket_cls.return_value.__enter__.return_value = mock_sock
 
-            result = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
+            success, msg = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
 
-            assert "sent" in result.lower()
+            assert success is True
+            assert "sent" in msg.lower()
             mock_sock.setsockopt.assert_called_once_with(
                 socket.SOL_SOCKET, socket.SO_BROADCAST, 1
             )
@@ -270,9 +271,10 @@ class TestSendWol:
             mock_sock = MagicMock()
             mock_socket_cls.return_value.__enter__.return_value = mock_sock
 
-            result = await send_wol("11:22:33:44:55:66", "192.168.1.255", 7)
+            success, msg = await send_wol("11:22:33:44:55:66", "192.168.1.255", 7)
 
-            assert "sent" in result.lower()
+            assert success is True
+            assert "sent" in msg.lower()
             mock_sock.sendto.assert_called_once()
             addr = mock_sock.sendto.call_args[0][1]
             assert addr == ("192.168.1.255", 7)
@@ -284,10 +286,10 @@ class TestSendWol:
             mock_socket_cls.return_value.__enter__.return_value = mock_sock
             mock_sock.sendto.side_effect = OSError("Network is unreachable")
 
-            result = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
+            success, msg = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
 
-            assert "error" in result.lower()
-            assert "unreachable" in result
+            assert success is False
+            assert "unreachable" in msg
 
     @pytest.mark.asyncio
     async def test_generic_exception(self):
@@ -296,16 +298,16 @@ class TestSendWol:
             mock_socket_cls.return_value.__enter__.return_value = mock_sock
             mock_sock.sendto.side_effect = RuntimeError("Unexpected failure")
 
-            result = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
+            success, _ = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
 
-            assert "error" in result.lower()
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_socket_creation_failure(self):
         with patch("wol_app.protocol.socket.socket") as mock_socket_cls:
             mock_socket_cls.side_effect = OSError("Permission denied")
-            result = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
-            assert "error" in result.lower()
+            success, _ = await send_wol("AA:BB:CC:DD:EE:FF", "255.255.255.255", 9)
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_packet_content(self):
@@ -335,27 +337,12 @@ class TestSendWol:
 # Device storage (save/load with auto-generated key)
 # ---------------------------------------------------------------------------
 
-def _setup_storage(tmp_path):
-    """Override storage paths to use a temp directory."""
-    import wol_app.storage as s
-    orig_key = s.KEY_FILE
-    orig_data = s.DATA_FILE
-    orig_settings = s.SETTINGS_FILE
-    s.KEY_FILE = str(tmp_path / ".crypt_key")
-    s.DATA_FILE = str(tmp_path / "devices.json")
-    s.SETTINGS_FILE = str(tmp_path / "settings.json")
-    s.invalidate_key_cache()
-    return s, (orig_key, orig_data, orig_settings)
 
-
-def _restore_storage(s, orig):
-    s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE = orig
-    s.invalidate_key_cache()
 
 
 class TestDeviceStorage:
     def test_save_and_load_roundtrip(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             devices = [
                 {"name": "Home PC", "mac": "AA:BB:CC:DD:EE:FF"},
@@ -364,54 +351,54 @@ class TestDeviceStorage:
             save_devices(devices)
             assert load_devices() == devices
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_load_empty_when_no_file(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             if os.path.exists(s.DATA_FILE):
                 os.remove(s.DATA_FILE)
             assert load_devices() == []
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_save_empty_list(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_devices([])
             assert load_devices() == []
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_load_corrupted_file_returns_empty(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             with open(s.DATA_FILE, "w", encoding="utf-8") as f:
                 f.write("not encrypted data")
             assert load_devices() == []
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_multiple_saves_overwrite(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_devices([{"name": "A", "mac": "AA:AA:AA:AA:AA:AA"}])
             save_devices([{"name": "B", "mac": "BB:BB:BB:BB:BB:BB"}])
             assert load_devices() == [{"name": "B", "mac": "BB:BB:BB:BB:BB:BB"}]
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_save_unicode_names(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             devices = [{"name": "Компьютер", "mac": "AA:BB:CC:DD:EE:FF"}]
             save_devices(devices)
             assert load_devices() == devices
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_save_large_number_of_devices(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             devices = [
                 {"name": f"Device {i}", "mac": f"AA:BB:CC:DD:EE:{i:02X}"}
@@ -420,10 +407,10 @@ class TestDeviceStorage:
             save_devices(devices)
             assert load_devices() == devices
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_encrypted_output_not_plaintext(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_devices([{"name": "secret", "mac": "AA:BB:CC:DD:EE:FF"}])
             with open(s.DATA_FILE, encoding="utf-8") as f:
@@ -432,10 +419,10 @@ class TestDeviceStorage:
             with pytest.raises((json.JSONDecodeError, ValueError)):
                 json.loads(raw)
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_crypt_key_generated_on_first_save(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_devices([{"name": "X", "mac": "AA:AA:AA:AA:AA:AA"}])
             assert os.path.exists(s.KEY_FILE)
@@ -443,10 +430,10 @@ class TestDeviceStorage:
                 key = f.read().strip()
             assert len(key) > 0
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_crypt_key_reused(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_devices([{"name": "A", "mac": "AA:AA:AA:AA:AA:AA"}])
             with open(s.KEY_FILE, encoding="utf-8") as f:
@@ -456,10 +443,10 @@ class TestDeviceStorage:
                 second_key = f.read()
             assert first_key == second_key
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_wrong_key_cant_read(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_devices([{"name": "secret", "mac": "AA:BB:CC:DD:EE:FF"}])
             with open(s.KEY_FILE, "w", encoding="utf-8") as f:
@@ -467,36 +454,36 @@ class TestDeviceStorage:
             s.invalidate_key_cache()
             assert load_devices() == []
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_settings_encrypted(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_settings({"theme_mode": "dark"})
             with open(s.SETTINGS_FILE, encoding="utf-8") as f:
                 raw = f.read()
             assert "theme_mode" not in raw
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_settings_roundtrip(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             save_settings({"theme_mode": "dark", "language": "ru"})
             loaded = load_settings()
             assert loaded.get("theme_mode") == "dark"
             assert loaded.get("language") == "ru"
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
     def test_settings_empty_when_no_file(self, tmp_path):
-        s, orig = _setup_storage(tmp_path)
+        s, orig = _patch_storage(tmp_path)
         try:
             if os.path.exists(s.SETTINGS_FILE):
                 os.remove(s.SETTINGS_FILE)
             assert load_settings() == {}
         finally:
-            _restore_storage(s, orig)
+            _unpatch_storage(s, orig)
 
 
 # ===========================================================================
@@ -520,7 +507,8 @@ def _make_mock_page():
 def _patch_storage(tmp_path):
     """Redirect storage files to a temp directory and return originals."""
     import wol_app.storage as s
-    orig = (s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE)
+    orig = (s.DATA_DIR, s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE)
+    s.DATA_DIR = "."
     s.KEY_FILE = str(tmp_path / ".crypt_key")
     s.DATA_FILE = str(tmp_path / "devices.json")
     s.SETTINGS_FILE = str(tmp_path / "settings.json")
@@ -529,7 +517,7 @@ def _patch_storage(tmp_path):
 
 
 def _unpatch_storage(s, orig):
-    s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE = orig
+    s.DATA_DIR, s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE = orig
     s.invalidate_key_cache()
 
 
@@ -540,7 +528,7 @@ class TestWolAppInit:
             page = _make_mock_page()
             WolApp(page)
             if sys.platform == "win32":
-                assert page.title == "Wake on LAN v0.5.1"
+                assert page.title == "Wake on LAN v0.5.2"
             else:
                 assert page.title == "Wake on LAN"
             assert page.padding == 0
@@ -792,7 +780,7 @@ class TestWolAppSendFromList:
             page = _make_mock_page()
             app = WolApp(page)
 
-            with patch("wol_app.ui.send_wol", return_value="Magic packet sent to AA:BB:CC:DD:EE:FF"):
+            with patch("wol_app.ui.send_wol", return_value=(True, "Magic packet sent to AA:BB:CC:DD:EE:FF")):
                 await app._send_from_list("AA:BB:CC:DD:EE:FF")
                 assert app.mac_input.value == "AA:BB:CC:DD:EE:FF"
         finally:
@@ -805,7 +793,7 @@ class TestWolAppSendFromList:
             page = _make_mock_page()
             app = WolApp(page)
 
-            with patch("wol_app.ui.send_wol", return_value="Magic packet sent to AA:BB:CC:DD:EE:FF"):
+            with patch("wol_app.ui.send_wol", return_value=(True, "Magic packet sent to AA:BB:CC:DD:EE:FF")):
                 await app._send_from_list("AA:BB:CC:DD:EE:FF", "10.0.0.255", "7")
                 assert app.ip_input.value == "10.0.0.255"
                 assert app.port_input.value == "7"
@@ -877,8 +865,9 @@ class TestIntegration:
         with patch("wol_app.protocol.socket.socket") as mock_cls:
             mock_sock = MagicMock()
             mock_cls.return_value.__enter__.return_value = mock_sock
-            result = await send_wol(mac_str, "255.255.255.255", 9)
-            assert "sent" in result.lower()
+            success, msg = await send_wol(mac_str, "255.255.255.255", 9)
+            assert success is True
+            assert "sent" in msg.lower()
 
     @pytest.mark.asyncio
     async def test_save_then_load_and_send(self, tmp_path):
@@ -896,7 +885,8 @@ class TestIntegration:
             with patch("wol_app.protocol.socket.socket") as mock_cls:
                 mock_sock = MagicMock()
                 mock_cls.return_value.__enter__.return_value = mock_sock
-                result = await send_wol(mac, "255.255.255.255", 9)
-                assert "sent" in result.lower()
+                success, msg = await send_wol(mac, "255.255.255.255", 9)
+                assert success is True
+                assert "sent" in msg.lower()
         finally:
             _unpatch_storage(s, orig)

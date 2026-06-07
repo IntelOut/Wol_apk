@@ -81,7 +81,7 @@ def build_magic_packet(mac: bytes) -> bytes:
     return b"\xff" * 6 + mac * 16
 
 
-async def send_wol(mac_address: str, ip: str, port: int) -> str:
+async def send_wol(mac_address: str, ip: str, port: int) -> tuple[bool, str]:
     """Send a Wake-on-LAN magic packet via UDP broadcast.
 
     The packet is constructed from the given MAC and delivered to the
@@ -94,13 +94,13 @@ async def send_wol(mac_address: str, ip: str, port: int) -> str:
         port:        Destination UDP port (typically 7 or 9).
 
     Returns:
-        A human-readable status message indicating success or describing
-        the error.
+        A ``(success, message)`` tuple where ``success`` is True on
+        successful packet delivery.
     """
     mac_bytes = mac_to_bytes(mac_address)
     packet = build_magic_packet(mac_bytes)
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _send():
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -110,8 +110,8 @@ async def send_wol(mac_address: str, ip: str, port: int) -> str:
 
     try:
         await loop.run_in_executor(None, _send)
-        return f"Magic packet sent to {mac_address}"
+        return (True, f"Magic packet sent to {mac_address}")
     except OSError as e:
-        return f"Network error: {e}"
+        return (False, f"Network error: {e}")
     except Exception as e:
-        return f"Error: {e}"
+        return (False, f"Error: {e}")
