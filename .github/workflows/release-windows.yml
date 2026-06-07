@@ -1,0 +1,30 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - "v*windows*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Build Windows executable
+        run: |
+          flet build windows --build-version $env:GITHUB_REF_NAME.Split('-')[0].Substring(1)
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: build/windows/**/*
+          generate_release_notes: true
