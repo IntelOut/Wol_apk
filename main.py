@@ -2,6 +2,9 @@
 
 Sends Wake-on-LAN magic packets to devices on the local network.
 Supports saving device lists, dark/light theme, and error handling.
+
+Copyright IntelOut (c) 2026. All rights reserved.
+https://github.com/IntelOut
 """
 
 import asyncio
@@ -17,6 +20,7 @@ from flet.security import encrypt, decrypt
 
 DATA_FILE = "devices.json"
 CRYPT_KEY = "wol-app-secret-key-32bytes"
+VERSION = "0.3.0"
 
 
 def _validate_mac(mac: str) -> bool:
@@ -465,6 +469,15 @@ class WolApp:
                                 ),
                                 padding=Padding(left=20, top=0, right=20, bottom=20),
                             ),
+                            ft.Container(
+                                content=ft.Text(
+                                    f"v{VERSION}",
+                                    size=12,
+                                    color=ft.Colors.GREY_500,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
+                                padding=Padding.symmetric(vertical=10, horizontal=20),
+                            ),
                         ],
                         spacing=0,
                         scroll=ft.ScrollMode.AUTO,
@@ -482,4 +495,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(target=main)

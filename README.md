@@ -29,7 +29,7 @@ pip install flet
 pip install flet
 flet build apk \
   --icon icon.png \
-  --build-version 1.0.0 \
+  --build-version 0.3.0 \
   --build-number 1 \
   --org com.yourorg.wol \
   --product wol-app
