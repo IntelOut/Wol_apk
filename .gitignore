@@ -180,3 +180,8 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .kilo/
+
+# Runtime data files
+devices.json
+settings.json
+.crypt_key
