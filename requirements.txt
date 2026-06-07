@@ -1,1 +1,2 @@
 flet>=0.85.2
+cryptography>=42.0
