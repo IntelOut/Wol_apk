@@ -185,3 +185,6 @@ cython_debug/
 devices.json
 settings.json
 .crypt_key
+
+# Production binary icons (generated from assets/icon.png)
+icon.ico

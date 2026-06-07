@@ -8,7 +8,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from wol_app.protocol import build_magic_packet, mac_to_bytes, send_wol, validate_mac
+from wol_app.protocol import (
+    auto_format_mac,
+    build_magic_packet,
+    mac_to_bytes,
+    send_wol,
+    validate_ip,
+    validate_mac,
+)
 from wol_app.storage import load_devices, load_settings, save_devices, save_settings
 from wol_app.ui import WolApp
 
@@ -80,6 +87,86 @@ class TestValidateMac:
     def test_none_value(self):
         with pytest.raises((AttributeError, TypeError)):
             validate_mac(None)
+
+
+# ---------------------------------------------------------------------------
+# validate_ip
+# ---------------------------------------------------------------------------
+
+
+class TestValidateIp:
+    def test_valid_standard(self):
+        assert validate_ip("192.168.1.1") is True
+
+    def test_valid_broadcast(self):
+        assert validate_ip("255.255.255.255") is True
+
+    def test_valid_zero(self):
+        assert validate_ip("0.0.0.0") is True
+
+    def test_valid_max(self):
+        assert validate_ip("255.255.255.255") is True
+
+    def test_valid_all_octets(self):
+        assert validate_ip("10.0.0.1") is True
+        assert validate_ip("172.16.0.1") is True
+        assert validate_ip("224.0.0.1") is True
+
+    def test_invalid_too_many_octets(self):
+        assert validate_ip("1.2.3.4.5") is False
+
+    def test_invalid_too_few_octets(self):
+        assert validate_ip("1.2.3") is False
+
+    def test_invalid_empty(self):
+        assert validate_ip("") is False
+
+    def test_invalid_letters(self):
+        assert validate_ip("abc.def.ghi.jkl") is False
+
+    def test_invalid_octet_overflow(self):
+        assert validate_ip("256.1.2.3") is False
+
+    def test_invalid_negative_octet(self):
+        assert validate_ip("-1.2.3.4") is False
+
+    def test_invalid_leading_zeros(self):
+        assert validate_ip("01.2.3.4") is True
+
+    def test_valid_whitespace(self):
+        assert validate_ip("  10.0.0.1  ") is True
+
+    def test_none_value(self):
+        with pytest.raises((AttributeError, TypeError)):
+            validate_ip(None)
+
+
+# ---------------------------------------------------------------------------
+# auto_format_mac
+# ---------------------------------------------------------------------------
+
+
+class TestAutoFormatMac:
+    def test_12_hex_chars(self):
+        assert auto_format_mac("AABBCCDDEEFF") == "AA:BB:CC:DD:EE:FF"
+
+    def test_lowercase(self):
+        assert auto_format_mac("aabbccddeeff") == "aa:bb:cc:dd:ee:ff"
+
+    def test_already_formatted(self):
+        assert auto_format_mac("AA:BB:CC:DD:EE:FF") == "AA:BB:CC:DD:EE:FF"
+
+    def test_too_short(self):
+        assert auto_format_mac("AABBCCDDEE") == "AABBCCDDEE"
+
+    def test_too_long(self):
+        assert auto_format_mac("AABBCCDDEEFFFF") == "AABBCCDDEEFFFF"
+
+    def test_empty(self):
+        assert auto_format_mac("") == ""
+
+    def test_invalid_chars(self):
+        assert auto_format_mac("GGHHIIJJKKLL") == "GGHHIIJJKKLL"
 
 
 # ---------------------------------------------------------------------------
@@ -257,11 +344,13 @@ def _setup_storage(tmp_path):
     s.KEY_FILE = str(tmp_path / ".crypt_key")
     s.DATA_FILE = str(tmp_path / "devices.json")
     s.SETTINGS_FILE = str(tmp_path / "settings.json")
+    s.invalidate_key_cache()
     return s, (orig_key, orig_data, orig_settings)
 
 
 def _restore_storage(s, orig):
     s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE = orig
+    s.invalidate_key_cache()
 
 
 class TestDeviceStorage:
@@ -375,6 +464,7 @@ class TestDeviceStorage:
             save_devices([{"name": "secret", "mac": "AA:BB:CC:DD:EE:FF"}])
             with open(s.KEY_FILE, "w", encoding="utf-8") as f:
                 f.write("aW52YWxpZC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXM=")
+            s.invalidate_key_cache()
             assert load_devices() == []
         finally:
             _restore_storage(s, orig)
@@ -434,11 +524,13 @@ def _patch_storage(tmp_path):
     s.KEY_FILE = str(tmp_path / ".crypt_key")
     s.DATA_FILE = str(tmp_path / "devices.json")
     s.SETTINGS_FILE = str(tmp_path / "settings.json")
+    s.invalidate_key_cache()
     return s, orig
 
 
 def _unpatch_storage(s, orig):
     s.KEY_FILE, s.DATA_FILE, s.SETTINGS_FILE = orig
+    s.invalidate_key_cache()
 
 
 class TestWolAppInit:
@@ -448,7 +540,7 @@ class TestWolAppInit:
             page = _make_mock_page()
             WolApp(page)
             if sys.platform == "win32":
-                assert page.title == "Wake on LAN v0.5.0"
+                assert page.title == "Wake on LAN v0.5.1"
             else:
                 assert page.title == "Wake on LAN"
             assert page.padding == 0

@@ -36,6 +36,20 @@ def mac_to_bytes(mac: str) -> bytes:
     return bytes.fromhex(mac.strip().replace(":", ""))
 
 
+def auto_format_mac(raw: str) -> str:
+    """Insert colons into a bare 12-hex-character MAC string.
+
+    Args:
+        raw: A string that may contain a MAC without separators.
+
+    Returns:
+        The formatted MAC if applicable, or the original string otherwise.
+    """
+    if raw and ":" not in raw and len(raw) == 12 and re.match(r"^[0-9A-Fa-f]{12}$", raw):
+        return ":".join(raw[i : i + 2] for i in range(0, 12, 2))
+    return raw
+
+
 def validate_ip(ip: str) -> bool:
     """Check whether a string is a valid IPv4 address.
 

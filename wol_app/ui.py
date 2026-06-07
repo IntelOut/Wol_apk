@@ -5,14 +5,13 @@ handlers, and state management, keeping the presentation layer
 separate from the WOL protocol and storage logic.
 """
 
-import re
 import sys
 
 import flet as ft
 from flet.controls.margin import Margin
 from flet.controls.padding import Padding
 
-from wol_app.protocol import send_wol, validate_ip, validate_mac
+from wol_app.protocol import auto_format_mac, send_wol, validate_ip, validate_mac
 from wol_app.storage import VERSION, load_devices, load_settings, save_devices, save_settings
 
 
@@ -276,8 +275,8 @@ class WolApp:
     def _auto_format_mac(self):
         """Insert colons into a raw 12-hex-character MAC string."""
         raw = self.mac_input.value.strip() if self.mac_input.value else ""
-        if raw and ":" not in raw and len(raw) == 12 and re.match(r"^[0-9A-Fa-f]{12}$", raw):
-            formatted = ":".join(raw[i : i + 2] for i in range(0, 12, 2))
+        formatted = auto_format_mac(raw)
+        if formatted != raw:
             self.mac_input.value = formatted
 
     def _validate_mac_field(self, e):
@@ -323,6 +322,15 @@ class WolApp:
         self.page.overlay.append(snack)
         self.page.update()
 
+    def _run_send(self, mac: str, ip: str = "", port: str = ""):
+        """Spawn the async WOL send coroutine from a card click event."""
+        self.page.run_task(self._send_from_list, mac, ip, port)
+
+    def _prompt_delete(self, index: int):
+        """Show the delete confirmation dialog for the given device index."""
+        self._pending_delete_index = index
+        self.page.show_dialog(self.confirm_delete_dialog)
+
     def refresh_device_list(self):
         """Reload the device list from storage and rebuild the UI cards."""
         self.device_cards.controls.clear()
@@ -339,16 +347,6 @@ class WolApp:
                 subtitle_parts.append(f"port {dev_port}")
             subtitle = " | ".join(subtitle_parts) if len(subtitle_parts) > 1 else mac
 
-            async def _on_send(_, _mac=mac, _ip=dev_ip, _port=dev_port):
-                await self._send_from_list(_mac, _ip, _port)
-
-            def _on_edit(_, _idx=i):
-                self._start_edit(_idx)
-
-            def _on_delete(_, _idx=i):
-                self._pending_delete_index = _idx
-                self.page.show_dialog(self.confirm_delete_dialog)
-
             card = ft.Card(
                 content=ft.Container(
                     content=ft.ListTile(
@@ -361,18 +359,18 @@ class WolApp:
                                     icon=ft.Icons.EDIT,
                                     tooltip="Edit",
                                     icon_size=24,
-                                    on_click=_on_edit,
+                                    on_click=lambda _, _idx=i: self._start_edit(_idx),
                                 ),
                                 ft.IconButton(
                                     icon=ft.Icons.DELETE_OUTLINE,
                                     tooltip="Delete",
                                     icon_size=28,
-                                    on_click=_on_delete,
+                                    on_click=lambda _, _idx=i: self._prompt_delete(_idx),
                                 ),
                             ],
                             spacing=0,
                         ),
-                        on_click=_on_send,
+                        on_click=lambda _, _mac=mac, _ip=dev_ip, _port=dev_port: self._run_send(_mac, _ip, _port),
                     ),
                     padding=Padding.symmetric(vertical=4, horizontal=4),
                 ),
@@ -472,6 +470,8 @@ class WolApp:
         if not validate_mac(mac):
             raise ValueError("Invalid MAC format. Use XX:XX:XX:XX:XX:XX")
         ip = self.ip_input.value.strip() if self.ip_input.value else "255.255.255.255"
+        if ip and not validate_ip(ip):
+            raise ValueError("Invalid IP address format")
         try:
             port = int(self.port_input.value.strip()) if self.port_input.value else 9
         except ValueError as e:

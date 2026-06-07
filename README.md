@@ -54,7 +54,7 @@ pip install flet
 pip install flet
 flet build apk \
   --icon assets/icon.png \
-  --build-version 0.5.0 \
+  --build-version 0.5.1 \
   --build-number 1 \
   --org com.intelout.wol \
   --orientation portrait

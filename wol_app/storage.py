@@ -6,26 +6,23 @@ encrypted with this key via PBKDF2 + Fernet (AES-128-CBC).
 """
 
 import base64
+import functools
 import json
+import logging
 import os
 
 from flet.security import decrypt, encrypt
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 DATA_FILE = "devices.json"
 SETTINGS_FILE = "settings.json"
 KEY_FILE = ".crypt_key"
 
+_logger = logging.getLogger(__name__)
 
+
+@functools.lru_cache(maxsize=1)
 def _get_encryption_key() -> str:
-    """Return the stored encryption key or generate a new one.
-
-    The key is a 32-byte random value encoded in URL-safe Base64.
-    On Unix-like systems the key file is chmod'ed to 0600.
-
-    Returns:
-        A Base64-encoded encryption key string.
-    """
     if os.path.exists(KEY_FILE):
         with open(KEY_FILE, encoding="utf-8") as f:
             return f.read().strip()
@@ -35,41 +32,24 @@ def _get_encryption_key() -> str:
     try:
         os.chmod(KEY_FILE, 0o600)
     except Exception:
-        pass
+        _logger.warning("could not set permissions on %s", KEY_FILE)
     return key
 
 
+def invalidate_key_cache():
+    """Clear the cached encryption key (used by tests after changing KEY_FILE)."""
+    _get_encryption_key.cache_clear()
+
+
 def _encrypt_data(plaintext: str) -> str:
-    """Encrypt plaintext with the device-specific key.
-
-    Args:
-        plaintext: String data to encrypt.
-
-    Returns:
-        URL-safe Base64 ciphertext.
-    """
     return encrypt(plaintext, _get_encryption_key())
 
 
 def _decrypt_data(ciphertext: str) -> str:
-    """Decrypt ciphertext that was produced by :func:`_encrypt_data`.
-
-    Args:
-        ciphertext: URL-safe Base64 payload from a previous :func:`encrypt` call.
-
-    Returns:
-        Decrypted UTF-8 text.
-    """
     return decrypt(ciphertext, _get_encryption_key())
 
 
 def load_devices() -> list:
-    """Load the saved device list from the encrypted data file.
-
-    Returns:
-        A list of device dicts, or an empty list if the file does not
-        exist or cannot be decrypted.
-    """
     if not os.path.exists(DATA_FILE):
         return []
     try:
@@ -82,11 +62,6 @@ def load_devices() -> list:
 
 
 def save_devices(devices: list) -> None:
-    """Persist the device list to the encrypted data file.
-
-    Args:
-        devices: A list of device dicts to save.
-    """
     plain = json.dumps(devices, ensure_ascii=False)
     encrypted = _encrypt_data(plain)
     with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -94,12 +69,6 @@ def save_devices(devices: list) -> None:
 
 
 def load_settings() -> dict:
-    """Load application settings (theme, …) from the encrypted file.
-
-    Returns:
-        A settings dict, or an empty dict if the file does not exist or
-        cannot be decrypted.
-    """
     if not os.path.exists(SETTINGS_FILE):
         return {}
     try:
@@ -112,11 +81,6 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict) -> None:
-    """Persist application settings to the encrypted file.
-
-    Args:
-        settings: A dict of settings key-value pairs.
-    """
     plain = json.dumps(settings, ensure_ascii=False)
     encrypted = _encrypt_data(plain)
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
