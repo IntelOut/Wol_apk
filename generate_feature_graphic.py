@@ -14,11 +14,11 @@ def main():
     draw = ImageDraw.Draw(bg)
 
     icon = Image.open("icon.png").convert("RGBA")
-    icon_resized = icon.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
+    icon_resized = icon.resize((ICON_SIZE, ICON_SIZE), Image.NEAREST)
 
     ix = (W - ICON_SIZE) // 2
     iy = 60
-    bg.paste(icon_resized, (ix, iy), icon_resized)
+    bg.paste(icon_resized, (ix, iy))
 
     try:
         font_title = ImageFont.truetype("arial.ttf", 42)
