@@ -466,7 +466,7 @@ class TestWolAppInputs:
         app = WolApp(page)
         app.mac_input.value = "  AA:BB:CC:DD:EE:FF  "
         app.ip_input.value = "  10.0.0.1  "
-        mac, ip, port = app.validate_inputs()
+        mac, ip, _ = app.validate_inputs()
         assert mac == "AA:BB:CC:DD:EE:FF"
         assert ip.strip() == ip  # already stripped inside validate_inputs
 

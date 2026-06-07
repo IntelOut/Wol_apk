@@ -12,15 +12,15 @@ import json
 import os
 import re
 import socket
+
 import flet as ft
 from flet.controls.margin import Margin
 from flet.controls.padding import Padding
-from flet.security import encrypt, decrypt
-
+from flet.security import decrypt, encrypt
 
 DATA_FILE = "devices.json"
 CRYPT_KEY = "wol-app-secret-key-32bytes"
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 
 def _validate_mac(mac: str) -> bool:
@@ -75,7 +75,7 @@ def _load_devices() -> list:
     if not os.path.exists(DATA_FILE):
         return []
     try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
+        with open(DATA_FILE, encoding="utf-8") as f:
             encrypted = f.read()
         decrypted = decrypt(encrypted, CRYPT_KEY)
         return json.loads(decrypted)
@@ -305,8 +305,8 @@ class WolApp:
         ip = self.ip_input.value.strip() if self.ip_input.value else "255.255.255.255"
         try:
             port = int(self.port_input.value.strip()) if self.port_input.value else 9
-        except ValueError:
-            raise ValueError("Port must be a number")
+        except ValueError as e:
+            raise ValueError("Port must be a number") from e
         return mac, ip, port
 
     # --- WOL actions ------------------------------------------------------
