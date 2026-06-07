@@ -28,7 +28,7 @@ jobs:
 
       - name: Build APK
         run: |
-          flet build apk \
+          flet build apk --yes \
             --build-version ${GITHUB_REF_NAME%%-*} \
             --build-number ${{ github.run_number }} \
             --org com.intelout.wol
