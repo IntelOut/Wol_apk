@@ -215,7 +215,7 @@ class WolApp:
                     ),
                     padding=ft.Padding.symmetric(vertical=12, horizontal=20),
                 ),
-                *self._drawer_links("Privacy Policy", [
+                *self._drawer_links([
                     ("Privacy Policy (RU)", "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY_RU.md"),
                     ("Privacy Policy (EN)", "https://github.com/IntelOut/Wol_apk/blob/main/PRIVACY_POLICY.md"),
                 ]),
@@ -225,7 +225,7 @@ class WolApp:
                     ),
                     padding=ft.Padding.symmetric(vertical=12, horizontal=20),
                 ),
-                *self._drawer_links("User Agreement", [
+                *self._drawer_links([
                     ("User Agreement (RU)", "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT_RU.md"),
                     ("User Agreement (EN)", "https://github.com/IntelOut/Wol_apk/blob/main/USER_AGREEMENT.md"),
                 ]),
@@ -233,7 +233,7 @@ class WolApp:
         )
         self.page.drawer = self.drawer
 
-    def _on_theme_toggle(self, e):
+    def _on_theme_toggle(self, e) -> None:
         """Toggle between dark and light colour themes.
 
         Persists the choice to settings and updates the AppBar icon.
@@ -242,19 +242,19 @@ class WolApp:
         theme_key = "dark" if self._is_dark else "light"
         self.page.theme_mode = ft.ThemeMode.DARK if self._is_dark else ft.ThemeMode.LIGHT
         appbar = self.page.appbar
-        if appbar and appbar.actions:
-            appbar.actions[0].icon = ft.Icons.DARK_MODE if self._is_dark else ft.Icons.LIGHT_MODE
+        if appbar and appbar.actions:  # type: ignore[union-attr]
+            appbar.actions[0].icon = ft.Icons.DARK_MODE if self._is_dark else ft.Icons.LIGHT_MODE  # type: ignore[union-attr]
         save_settings({"theme_mode": theme_key})
         self.page.update()
 
-    def _auto_format_mac(self):
+    def _auto_format_mac(self) -> None:
         """Insert colons into a raw 12-hex-character MAC string."""
         raw = self.mac_input.value.strip() if self.mac_input.value else ""
         formatted = auto_format_mac(raw)
         if formatted != raw:
             self.mac_input.value = formatted
 
-    def _validate_mac_field(self, e):
+    def _validate_mac_field(self, e) -> None:
         """Perform real-time MAC validation and show ``error_text`` on the field."""
         self._auto_format_mac()
         mac = self.mac_input.value.strip() if self.mac_input.value else ""
@@ -264,7 +264,7 @@ class WolApp:
             self.mac_input.error_text = None
         self.page.update()
 
-    def _validate_ip_field(self, e):
+    def _validate_ip_field(self, e) -> None:
         """Replace commas with dots and validate IP format in real time."""
         raw = self.ip_input.value or ""
         if "," in raw:
@@ -280,14 +280,13 @@ class WolApp:
         """Open the navigation drawer (privacy / user agreement links)."""
         await self.page.show_drawer()
 
-    def _drawer_links(self, _section: str, items: list[tuple[str, str]]) -> list[ft.ListTile]:
+    def _drawer_links(self, items: list[tuple[str, str]]) -> list[ft.ListTile]:
         """Build a list of ``ListTile`` controls that open external URLs.
 
         Each tile displays a document title and opens the corresponding
         URL when tapped.
 
         Args:
-            _section: Section label (unused, kept for consistency).
             items: Pairs of ``(display_title, url)``.
 
         Returns:
@@ -313,7 +312,7 @@ class WolApp:
 
     # --- helpers ----------------------------------------------------------
 
-    def show_snack(self, message: str, error: bool = False):
+    def show_snack(self, message: str, error: bool = False) -> None:
         """Display a brief SnackBar notification.
 
         Args:
@@ -514,7 +513,7 @@ class WolApp:
 
     # --- input validation -------------------------------------------------
 
-    def validate_inputs(self) -> tuple:
+    def validate_inputs(self) -> tuple[str, str, int]:
         """Validate the form fields and return cleaned values.
 
         Returns:
