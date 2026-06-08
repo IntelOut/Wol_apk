@@ -26,14 +26,17 @@ def main(page: ft.Page):
     data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
     migrate_from_cwd(data_dir)
     set_data_dir(data_dir)
-    icon = (
-        "icon.ico"
-        if sys.platform == "win32" and os.path.exists(os.path.join("assets", "icon.ico"))
-        else "icon.png"
-    )
-    page.window.icon = os.path.abspath(os.path.join("assets", icon))
-    page.window.width = 360
-    page.window.height = 760
+    if page.platform in (ft.PagePlatform.WINDOWS, ft.PagePlatform.LINUX, ft.PagePlatform.MACOS):
+        icon = (
+            "icon.ico"
+            if sys.platform == "win32" and os.path.exists(os.path.join("assets", "icon.ico"))
+            else "icon.png"
+        )
+        page.window.icon = os.path.abspath(os.path.join("assets", icon))
+        page.window.width = 400
+        page.window.height = 800
+        page.window.max_width = 400
+        page.window.max_height = 800
     WolApp(page)
 
 

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from wol_app.config import VERSION
 from wol_app.models import Device
 from wol_app.protocol import (
     auto_format_mac,
@@ -670,7 +671,7 @@ class TestWolAppInit:
             page = _make_mock_page()
             WolApp(page)
             if sys.platform == "win32":
-                assert page.title == "Wake on LAN v0.6.0"
+                assert page.title == f"Wake on LAN v{VERSION}"
             else:
                 assert page.title == "Wake on LAN"
             assert page.padding == 0
