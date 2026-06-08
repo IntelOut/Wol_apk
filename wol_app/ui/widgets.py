@@ -1,16 +1,39 @@
+import time
 from functools import partial
 
 import flet as ft
+
+from wol_app.strings import get_strings
+
+
+def _format_last_woken(ts: float | None, s: dict[str, str]) -> str:
+    if ts is None:
+        return ""
+    elapsed = time.time() - ts
+    if elapsed < 60:
+        return s["just_now"]
+    if elapsed < 3600:
+        mins = int(elapsed // 60)
+        return f"{mins}{s['min_ago']}"
+    if elapsed < 86400:
+        hours = int(elapsed // 3600)
+        return f"{hours}{s['hour_ago']}"
+    days = int(elapsed // 86400)
+    return f"{days}{s['day_ago']}"
 
 
 def build_device_card(
     dev, index: int,
     on_edit, on_delete, on_click, on_dismiss,
+    s=None,
 ) -> ft.Dismissible:
+    if s is None:
+        s = get_strings("en")
     subtitle = ft.Row(
         controls=[ft.Text(dev.mac, size=12, color=ft.Colors.GREY_600)],
         wrap=True,
         spacing=0,
+        expand=True,
     )
     if dev.ip:
         subtitle.controls.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_500))
@@ -18,19 +41,24 @@ def build_device_card(
     if dev.port:
         subtitle.controls.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_500))
         subtitle.controls.append(ft.Text(str(dev.port), size=12, color=ft.Colors.GREY_600))
+    last_woken_str = _format_last_woken(dev.last_woken, s)
+    if last_woken_str:
+        subtitle.controls.append(ft.Text(f" | {s['woke']} {last_woken_str}", size=11, color=ft.Colors.GREY_400))
 
     card = ft.Card(
+        expand=True,
         content=ft.Container(
+            expand=True,
             content=ft.Row(
                 controls=[
                     ft.Icon(ft.Icons.DEVICES, size=20),
                     ft.Column(
+                        expand=True,
                         controls=[
                             ft.Text(dev.name, size=14, weight=ft.FontWeight.W_600),
                             subtitle,
                         ],
                         spacing=0,
-                        expand=True,
                     ),
                     ft.Row(
                         controls=[
@@ -81,9 +109,13 @@ def build_device_card(
     )
 
 
-def build_empty_state() -> ft.Container:
+def build_empty_state(s=None, expand=False) -> ft.Container:
+    if s is None:
+        s = get_strings("en")
     return ft.Container(
+        expand=expand,
         content=ft.Column(
+            expand=True,
             controls=[
                 ft.Icon(
                     ft.Icons.DEVICES_OTHER_OUTLINED,
@@ -91,13 +123,13 @@ def build_empty_state() -> ft.Container:
                     color=ft.Colors.GREY_400,
                 ),
                 ft.Text(
-                    "No saved devices yet",
+                    s["no_devices"],
                     size=16,
                     color=ft.Colors.GREY_500,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Text(
-                    "Add a device above and tap Save",
+                    s["no_devices_hint"],
                     size=14,
                     color=ft.Colors.GREY_400,
                     text_align=ft.TextAlign.CENTER,
@@ -115,16 +147,18 @@ def build_loading() -> ft.ProgressRing:
     return ft.ProgressRing(width=24, height=24, visible=False)
 
 
-def build_sending_label() -> ft.Text:
-    return ft.Text("Sending...", size=14, color=ft.Colors.GREY_500, visible=False)
+def build_sending_label(s=None) -> ft.Text:
+    if s is None:
+        s = get_strings("en")
+    return ft.Text(s["send"], size=14, color=ft.Colors.GREY_500, visible=False)
 
 
-def build_wake_button(on_click) -> ft.Button:
+def build_wake_button(s, on_click) -> ft.Button:
     return ft.Button(
         content=ft.Row(
             controls=[
                 ft.Icon(ft.Icons.POWER_SETTINGS_NEW, size=24),
-                ft.Text("Wake Up", size=18),
+                ft.Text(s["wake_up"], size=18),
             ],
             alignment=ft.MainAxisAlignment.CENTER,
         ),
@@ -137,8 +171,12 @@ def build_wake_button(on_click) -> ft.Button:
     )
 
 
-def build_drawer(version: str, privacy_urls, agreement_urls, on_open_url) -> ft.NavigationDrawer:
+def build_drawer(version, privacy_urls, agreement_urls, on_open_url,
+                 on_open_log=None, s=None) -> ft.NavigationDrawer:
+    if s is None:
+        s = get_strings("en")
     controls: list[ft.Control] = []
+
     if privacy_urls:
         controls.append(
             ft.Container(
@@ -175,6 +213,16 @@ def build_drawer(version: str, privacy_urls, agreement_urls, on_open_url) -> ft.
                 )
             )
 
+    if on_open_log:
+        controls.append(ft.Divider(height=1))
+        controls.append(
+            ft.ListTile(
+                leading=ft.Icon(ft.Icons.TERMINAL_OUTLINED),
+                title=ft.Text(s["log_viewer"]),
+                on_click=on_open_log,
+            )
+        )
+
     return ft.NavigationDrawer(
         controls=[
             ft.Container(
@@ -188,7 +236,7 @@ def build_drawer(version: str, privacy_urls, agreement_urls, on_open_url) -> ft.
                             ),
                             padding=ft.Padding(left=0, top=0, right=0, bottom=8),
                         ),
-                        ft.Text("Wake on LAN", size=22, weight=ft.FontWeight.BOLD),
+                        ft.Text("WakeOnLAN", size=22, weight=ft.FontWeight.BOLD),
                         ft.Row(
                             controls=[
                                 ft.Text(f"v{version}", size=14, color=ft.Colors.GREY_500),
@@ -209,10 +257,12 @@ def build_drawer(version: str, privacy_urls, agreement_urls, on_open_url) -> ft.
     )
 
 
-def build_mac_input(on_change) -> ft.TextField:
+def build_mac_input(on_change, s=None) -> ft.TextField:
+    if s is None:
+        s = get_strings("en")
     return ft.TextField(
-        label="MAC-address",
-        hint_text="XX:XX:XX:XX:XX:XX",
+        label=s["mac_address"],
+        hint_text=s["mac_hint"],
         prefix_icon=ft.Icons.WIFI,
         border_radius=12,
         text_size=16,
@@ -221,23 +271,27 @@ def build_mac_input(on_change) -> ft.TextField:
     )
 
 
-def build_mac_helper() -> ft.Icon:
+def build_mac_helper(s=None) -> ft.Icon:
+    if s is None:
+        s = get_strings("en")
     return ft.Icon(
         ft.Icons.HELP_OUTLINE,
         size=24,
         color=ft.Colors.GREY_500,
         tooltip=ft.Tooltip(
-            message="Format: XX:XX:XX:XX:XX:XX\ne.g. AA:BB:CC:DD:EE:FF",
+            message=s["mac_helper"],
             padding=10,
             vertical_offset=0,
         ),
     )
 
 
-def build_ip_input(on_change) -> ft.TextField:
+def build_ip_input(on_change, s=None) -> ft.TextField:
+    if s is None:
+        s = get_strings("en")
     return ft.TextField(
-        label="IP or Broadcast",
-        hint_text="255.255.255.255",
+        label=s["ip_or_broadcast"],
+        hint_text=s["ip_hint"],
         prefix_icon=ft.Icons.LAN,
         border_radius=12,
         text_size=16,
@@ -247,10 +301,12 @@ def build_ip_input(on_change) -> ft.TextField:
     )
 
 
-def build_port_input() -> ft.TextField:
+def build_port_input(s=None) -> ft.TextField:
+    if s is None:
+        s = get_strings("en")
     return ft.TextField(
-        label="Port",
-        hint_text="9",
+        label=s["port"],
+        hint_text=s["port_hint"],
         prefix_icon=ft.Icons.SETTINGS_ETHERNET,
         border_radius=12,
         text_size=16,
@@ -259,10 +315,12 @@ def build_port_input() -> ft.TextField:
     )
 
 
-def build_name_input() -> ft.TextField:
+def build_name_input(s=None) -> ft.TextField:
+    if s is None:
+        s = get_strings("en")
     return ft.TextField(
-        label="Device name",
-        hint_text="e.g. Home PC",
+        label=s["device_name"],
+        hint_text=s["device_name_hint"],
         prefix_icon=ft.Icons.LABEL_OUTLINE,
         border_radius=12,
         text_size=16,

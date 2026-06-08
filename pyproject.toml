@@ -1,3 +1,9 @@
+[project]
+name = "wol_app"
+version = "0.7.2"
+description = "Wake-on-LAN application"
+requires-python = ">=3.12"
+
 [tool.ruff]
 target-version = "py313"
 src = ["."]
@@ -22,3 +28,6 @@ good-names = ["i", "j", "k", "e", "_", "ex", "fp", "fn"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.pytest_html]
+report = "tests/reports/report.html"

@@ -18,7 +18,7 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: python -m pylint main.py wol_app/ tests/test_main.py
+        entry: python -m pylint main.py wol_app/ tests/
         language: system
         types: [python]
         pass_filenames: false
