@@ -1,19 +1,15 @@
-name: Release Android
+name: Release Canary / Beta
 
 on:
   push:
     tags:
-      - "v*android*"
+      - "v*-rc*"
 
 permissions:
   contents: write
 
-env:
-  GRADLE_USER_HOME: /home/runner/.gradle
-  PUB_CACHE: /home/runner/.pub-cache
-
 jobs:
-  build-android:
+  build-canary:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,8 +30,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ${{ env.GRADLE_USER_HOME }}/caches
-            ${{ env.GRADLE_USER_HOME }}/wrapper
+            /home/runner/.gradle/caches
+            /home/runner/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -44,7 +40,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ${{ env.PUB_CACHE }}
+            /home/runner/.pub-cache
             ~/flutter
           key: ${{ runner.os }}-flutter-${{ hashFiles('requirements.txt') }}
           restore-keys: |
@@ -59,28 +55,39 @@ jobs:
             /usr/local/lib/android/sdk/cmdline-tools
           key: ${{ runner.os }}-android-sdk-${{ hashFiles('requirements.txt') }}
 
-      - name: Build APK
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # v0.7.1-rc1-android -> 0.7.1-rc1
+          VERSION="${TAG#v}"
+          # Remove suffix after last dash containing platform hint
+          VERSION="${VERSION%-android}"
+          VERSION="${VERSION%-windows}"
+          echo "BUILD_VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Build APK (canary)
         run: |
           flet build apk --yes \
-            --build-version ${GITHUB_REF_NAME%%-*} \
+            --build-version ${{ env.BUILD_VERSION }} \
             --build-number ${{ github.run_number }} \
-            --org com.intelout.wol \
-            --project-name WakeOnLAN
+            --org com.intelout.wol
 
       - name: Smoke test — verify APK exists
         run: |
           if ls build/apk/*.apk 1>/dev/null 2>&1; then
-            echo "APK found:"
+            echo "Canary APK:"
             ls -lh build/apk/*.apk
           else
-            echo "ERROR: No APK found in build/apk/"
+            echo "ERROR: No APK found"
             exit 1
           fi
 
-      - name: Create Release
+      - name: Create Pre-release
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           files: build/apk/*.apk
+          prerelease: true
           generate_release_notes: true
