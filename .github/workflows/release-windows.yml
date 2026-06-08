@@ -21,7 +21,19 @@ jobs:
         env:
           FLET_CLI_NO_RICH_OUTPUT: "true"
         run: |
-          flet build windows --build-version $env:GITHUB_REF_NAME.Split('-')[0].Substring(1)
+          flet build windows --build-version $env:GITHUB_REF_NAME.Split('-')[0].Substring(1) --project-name WakeOnLAN
+
+      - name: Smoke test — verify build output exists
+        shell: pwsh
+        run: |
+          $buildDir = "build\windows"
+          if (Test-Path $buildDir) {
+            Get-ChildItem -Path $buildDir -Recurse -File | Select-Object -First 10
+            Write-Host "Build output found at $buildDir"
+          } else {
+            Write-Error "ERROR: Build output not found at $buildDir"
+            exit 1
+          }
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

@@ -3,14 +3,18 @@
 Initialises the application window and launches the WolApp UI.
 """
 
+import logging
 import os
 import sys
 
 import flet as ft
 
 from wol_app.config import VERSION
+from wol_app.logging_setup import setup_logging, setup_sentry
 from wol_app.storage import migrate_from_cwd, set_data_dir
 from wol_app.ui import WolApp
+
+_logger = logging.getLogger(__name__)
 
 
 def main(page: ft.Page):
@@ -24,6 +28,16 @@ def main(page: ft.Page):
         page: The root Flet page provided by the framework.
     """
     data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
+    os.environ.setdefault("WOL_DATA_DIR", data_dir)
+
+    setup_logging(data_dir)
+    _logger.info("Starting WakeOnLAN v%s", VERSION)
+
+    sentry_dsn = os.environ.get("WOL_SENTRY_DSN", "")
+    sentry_consent = os.environ.get("WOL_SENTRY_CONSENT", "0") == "1"
+    if sentry_dsn:
+        setup_sentry(sentry_dsn, consent_given=sentry_consent)
+
     migrate_from_cwd(data_dir)
     set_data_dir(data_dir)
     if page.platform in (ft.PagePlatform.WINDOWS, ft.PagePlatform.LINUX, ft.PagePlatform.MACOS):
@@ -41,4 +55,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.run(main=main, name=f"Wake on LAN v{VERSION}")
+    ft.run(main=main, name=f"WakeOnLAN v{VERSION}")

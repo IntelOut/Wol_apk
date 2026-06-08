@@ -1,7 +1,7 @@
-# Wake-on-LAN Flet приложение
+# WakeOnLAN
 
 Мобильное приложение для отправки Wake-on-LAN magic-пакетов через UDP broadcast.
-Поддерживает сохранение устройств с шифрованием, тёмную/светлую тему, редактирование и per-device IP/порт.
+Поддерживает сохранение устройств с шифрованием, тёмную/светлую тему, RU/EN локализацию, редактирование и per-device IP/порт.
 
 [![Test](https://github.com/IntelOut/Wol_apk/actions/workflows/test.yml/badge.svg)](https://github.com/IntelOut/Wol_apk/actions/workflows/test.yml)
 
@@ -14,9 +14,14 @@
 - Редактирование и удаление устройств (свайп / кнопка)
 - Per-device IP и порт, автоматическая подстановка при клике
 - Валидация MAC-адреса в реальном времени, автоформатирование
+- Валидация приватных IP (только локальная сеть: 10.x, 172.16-31.x, 192.168.x)
+- Валидация порта (1-65535)
 - Тёмная/светлая тема (переключатель в AppBar)
+- RU/EN локализация (переключатель в AppBar)
 - ProgressRing + "Sending..." при отправке, Empty State для пустого списка
-- Навигационный drawer с Privacy Policy и User Agreement
+- Навигационный drawer с Privacy Policy и User Agreement (по языку)
+- Просмотр лога приложения с очисткой
+- Асинхронный таймаут (10с) и correlation ID при отправке
 - Адаптивно под Android (APK) и Windows
 
 ---
@@ -31,18 +36,26 @@
 │   ├── models.py             # Device dataclass
 │   ├── protocol.py           # WOL-функции (MAC, magic packet, отправка)
 │   ├── storage.py            # Шифрование, загрузка/сохранение данных, миграция
+│   ├── strings.py            # i18n (EN/RU)
+│   ├── logging_setup.py      # Настройка логирования и Sentry
 │   └── ui/
 │       ├── __init__.py       # Re-export WolApp
 │       ├── app.py            # WolApp — основной класс UI
 │       ├── widgets.py        # Переиспользуемые виджеты
-│       └── dialogs.py        # Диалоги
+│       ├── dialogs.py        # Диалоги (удаление, просмотр лога)
+│       └── widgets.py        # Переиспользуемые виджеты
 ├── assets/
 │   ├── icon.png              # Иконка приложения (Android)
 │   ├── icon.ico              # Иконка приложения (Windows)
 │   ├── icon256.png           # Иконка 256×256
 │   └── feature_graphic.png   # Графика для Google Play (1024×500)
 ├── tests/
-│   └── test_main.py          # 131 тест (pytest + pytest-asyncio)
+│   ├── conftest.py           # Фикстуры (mock_page, patched_storage)
+│   ├── test_protocol.py      # Тесты WOL-протокола
+│   ├── test_storage.py       # Тесты шифрования и Device model
+│   ├── test_ui.py            # Тесты WolApp UI
+│   ├── test_integration.py   # Интеграционные тесты
+│   └── test_e2e.py           # Smoke-тесты виджетов
 ├── .github/workflows/test.yml
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -96,8 +109,8 @@ pip install flet cryptography
 ### 2. Сборка APK (рекомендуется)
 ```bash
 pip install flet cryptography
-flet build apk \
-  --build-version 0.6.0 \
+flet build apk --project-name WakeOnLAN \
+  --build-version 0.7.2 \
   --build-number 1 \
   --org com.intelout.wol
 ```
@@ -130,7 +143,7 @@ PYTHONPATH=. pytest tests/ --cov=wol_app -v
 
 ## Google Play
 
-- **App title**: `Wake on LAN` (≤30 символов)
+- **App title**: `WakeOnLAN` (≤30 символов)
 - **Short description (≤80 символов)**: `Wake devices on your local network with one tap`
 - **Privacy Policy**: см. [PRIVACY_POLICY.md](PRIVACY_POLICY.md) / [PRIVACY_POLICY_RU.md](PRIVACY_POLICY_RU.md)
 - **User Agreement**: см. [USER_AGREEMENT.md](USER_AGREEMENT.md) / [USER_AGREEMENT_RU.md](USER_AGREEMENT_RU.md)

@@ -1,5 +1,4 @@
 import base64
-import functools
 import json
 import logging
 import os
@@ -11,16 +10,23 @@ from wol_app.models import Device
 DATA_FILE = "devices.json"
 SETTINGS_FILE = "settings.json"
 KEY_FILE = ".crypt_key"
-DATA_DIR = "."
 
 _logger = logging.getLogger(__name__)
+_logger.addHandler(logging.NullHandler())
+
+_default_storage: "Storage | None" = None
+
+
+def get_storage() -> "Storage":
+    global _default_storage
+    if _default_storage is None:
+        _default_storage = Storage(".")
+    return _default_storage
 
 
 def set_data_dir(path: str) -> None:
-    global DATA_DIR
-    DATA_DIR = path
-    os.makedirs(path, exist_ok=True)
-    invalidate_key_cache()
+    global _default_storage
+    _default_storage = Storage(path)
 
 
 def migrate_from_cwd(target_dir: str) -> None:
@@ -49,83 +55,100 @@ def migrate_from_cwd(target_dir: str) -> None:
             pass
 
 
-def _key_path() -> str:
-    return os.path.join(DATA_DIR, KEY_FILE)
+class Storage:
+    def __init__(self, data_dir: str):
+        self._data_dir = data_dir
+        self._key: str | None = None
+        os.makedirs(data_dir, exist_ok=True)
 
+    @property
+    def data_dir(self) -> str:
+        return self._data_dir
 
-def _data_path() -> str:
-    return os.path.join(DATA_DIR, DATA_FILE)
+    def _key_path(self) -> str:
+        return os.path.join(self._data_dir, KEY_FILE)
 
+    def _data_path(self) -> str:
+        return os.path.join(self._data_dir, DATA_FILE)
 
-def _settings_path() -> str:
-    return os.path.join(DATA_DIR, SETTINGS_FILE)
+    def _settings_path(self) -> str:
+        return os.path.join(self._data_dir, SETTINGS_FILE)
 
+    def _get_encryption_key(self) -> str:
+        if self._key is not None:
+            return self._key
+        kp = self._key_path()
+        if os.path.exists(kp):
+            with open(kp, encoding="utf-8") as f:
+                self._key = f.read().strip()
+                return self._key
+        key = base64.urlsafe_b64encode(os.urandom(32)).decode()
+        with open(kp, "w", encoding="utf-8") as f:
+            f.write(key)
+        if os.name != "nt":
+            try:
+                os.chmod(kp, 0o600)
+            except Exception:
+                _logger.warning("could not set permissions on %s", kp)
+        self._key = key
+        return key
 
-@functools.lru_cache(maxsize=1)
-def _get_encryption_key() -> str:
-    kp = _key_path()
-    if os.path.exists(kp):
-        with open(kp, encoding="utf-8") as f:
-            return f.read().strip()
-    key = base64.urlsafe_b64encode(os.urandom(32)).decode()
-    with open(kp, "w", encoding="utf-8") as f:
-        f.write(key)
-    try:
-        os.chmod(kp, 0o600)
-    except Exception:
-        _logger.warning("could not set permissions on %s", kp)
-    return key
+    def _encrypt(self, plaintext: str) -> str:
+        return encrypt(plaintext, self._get_encryption_key())
 
+    def _decrypt(self, ciphertext: str) -> str:
+        return decrypt(ciphertext, self._get_encryption_key())
 
-def invalidate_key_cache():
-    _get_encryption_key.cache_clear()
+    def load_devices(self) -> list[Device]:
+        dp = self._data_path()
+        if not os.path.exists(dp):
+            return []
+        try:
+            with open(dp, encoding="utf-8") as f:
+                encrypted = f.read()
+            decrypted = self._decrypt(encrypted)
+            data = json.loads(decrypted)
+            return [Device.from_dict(d) for d in data]
+        except Exception:
+            return []
 
+    def save_devices(self, devices: list) -> None:
+        data = [d.to_dict() if isinstance(d, Device) else d for d in devices]
+        plain = json.dumps(data, ensure_ascii=False)
+        encrypted = self._encrypt(plain)
+        with open(self._data_path(), "w", encoding="utf-8") as f:
+            f.write(encrypted)
 
-def _encrypt_data(plaintext: str) -> str:
-    return encrypt(plaintext, _get_encryption_key())
+    def load_settings(self) -> dict:
+        sp = self._settings_path()
+        if not os.path.exists(sp):
+            return {}
+        try:
+            with open(sp, encoding="utf-8") as f:
+                encrypted = f.read()
+            decrypted = self._decrypt(encrypted)
+            return json.loads(decrypted)
+        except Exception:
+            return {}
 
-
-def _decrypt_data(ciphertext: str) -> str:
-    return decrypt(ciphertext, _get_encryption_key())
+    def save_settings(self, settings: dict) -> None:
+        plain = json.dumps(settings, ensure_ascii=False)
+        encrypted = self._encrypt(plain)
+        with open(self._settings_path(), "w", encoding="utf-8") as f:
+            f.write(encrypted)
 
 
 def load_devices() -> list[Device]:
-    dp = _data_path()
-    if not os.path.exists(dp):
-        return []
-    try:
-        with open(dp, encoding="utf-8") as f:
-            encrypted = f.read()
-        decrypted = _decrypt_data(encrypted)
-        data = json.loads(decrypted)
-        return [Device.from_dict(d) for d in data]
-    except Exception:
-        return []
+    return get_storage().load_devices()
 
 
 def save_devices(devices: list) -> None:
-    data = [d.to_dict() if isinstance(d, Device) else d for d in devices]
-    plain = json.dumps(data, ensure_ascii=False)
-    encrypted = _encrypt_data(plain)
-    with open(_data_path(), "w", encoding="utf-8") as f:
-        f.write(encrypted)
+    get_storage().save_devices(devices)
 
 
 def load_settings() -> dict:
-    sp = _settings_path()
-    if not os.path.exists(sp):
-        return {}
-    try:
-        with open(sp, encoding="utf-8") as f:
-            encrypted = f.read()
-        decrypted = _decrypt_data(encrypted)
-        return json.loads(decrypted)
-    except Exception:
-        return {}
+    return get_storage().load_settings()
 
 
 def save_settings(settings: dict) -> None:
-    plain = json.dumps(settings, ensure_ascii=False)
-    encrypted = _encrypt_data(plain)
-    with open(_settings_path(), "w", encoding="utf-8") as f:
-        f.write(encrypted)
+    get_storage().save_settings(settings)
