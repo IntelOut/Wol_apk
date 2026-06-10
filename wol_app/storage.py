@@ -14,19 +14,19 @@ KEY_FILE = ".crypt_key"
 _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
 
-_default_storage: "Storage | None" = None
+_DEFAULT_STORAGE: "Storage | None" = None
 
 
 def get_storage() -> "Storage":
-    global _default_storage
-    if _default_storage is None:
-        _default_storage = Storage(".")
-    return _default_storage
+    global _DEFAULT_STORAGE
+    if _DEFAULT_STORAGE is None:
+        _DEFAULT_STORAGE = Storage(".")
+    return _DEFAULT_STORAGE
 
 
 def set_data_dir(path: str) -> None:
-    global _default_storage
-    _default_storage = Storage(path)
+    global _DEFAULT_STORAGE
+    _DEFAULT_STORAGE = Storage(path)
 
 
 def migrate_from_cwd(target_dir: str) -> None:
