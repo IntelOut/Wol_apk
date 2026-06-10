@@ -27,11 +27,17 @@ def main(page: ft.Page):
     Args:
         page: The root Flet page provided by the framework.
     """
-    data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
+    is_desktop = page.platform in (ft.PagePlatform.WINDOWS, ft.PagePlatform.LINUX, ft.PagePlatform.MACOS)
+
+    if is_desktop:
+        data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
+    else:
+        data_dir = os.path.join(os.path.expanduser("~"), ".wol_app_data")
+
     os.environ.setdefault("WOL_DATA_DIR", data_dir)
 
     setup_logging(data_dir)
-    _logger.info("Starting WakeOnLAN v%s", VERSION)
+    _logger.info("Starting WakeOnLAN v%s on %s", VERSION, page.platform)
 
     sentry_dsn = os.environ.get("WOL_SENTRY_DSN", "")
     sentry_consent = os.environ.get("WOL_SENTRY_CONSENT", "0") == "1"
@@ -40,7 +46,7 @@ def main(page: ft.Page):
 
     migrate_from_cwd(data_dir)
     set_data_dir(data_dir)
-    if page.platform in (ft.PagePlatform.WINDOWS, ft.PagePlatform.LINUX, ft.PagePlatform.MACOS):
+    if is_desktop:
         icon = (
             "icon.ico"
             if sys.platform == "win32" and os.path.exists(os.path.join("assets", "icon.ico"))
