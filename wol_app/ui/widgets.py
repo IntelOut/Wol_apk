@@ -24,7 +24,7 @@ def _format_last_woken(ts: float | None, s: dict[str, str]) -> str:
 
 def build_device_card(
     dev, index: int,
-    on_edit, on_delete, on_click, on_dismiss,
+    on_edit, on_delete, on_click,
     s=None,
 ) -> ft.Dismissible:
     if s is None:
@@ -105,7 +105,6 @@ def build_device_card(
             alignment=ft.Alignment(1.0, 0.0),
         ),
         dismiss_direction=ft.DismissDirection.END_TO_START,
-        on_dismiss=partial(on_dismiss, index),
     )
 
 
@@ -230,7 +229,7 @@ def build_drawer(version, privacy_urls, agreement_urls, on_open_url,
                     controls=[
                         ft.Container(
                             content=ft.Image(
-                                src="assets/icon.png",
+                                src="icon.png",
                                 width=64,
                                 height=64,
                             ),

@@ -22,11 +22,11 @@ class TestWolAppInit:
             assert page.title == "WakeOnLAN"
         assert page.padding == 0
 
-    def test_page_scroll(self, patched_storage):
+    def test_page_scroll_not_set(self, patched_storage):
         from tests.conftest import _make_mock_page
         page = _make_mock_page()
         WolApp(page)
-        assert page.scroll is not None
+        assert page.scroll is None
 
     def test_page_theme_mode_system(self, patched_storage):
         from tests.conftest import _make_mock_page

@@ -48,13 +48,18 @@ class WolApp:
         self._is_dark = True
         self._lang = "en"
         self.log_dialog = None
+        self._url_launcher = ft.UrlLauncher()
         settings = self._load_settings()
         self._lang = settings.get("lang", "en")
         self._s = get_strings(self._lang)
         self._setup_page()
         self._build_controls()
         self.refresh_device_list()
+        self.page.run_task(self._init_async)
+
+    async def _init_async(self):
         self._build_layout()
+        self.page.update()
         sentry_sdk.add_breadcrumb(category="ui", message="App initialized", level="info")
 
     def _load_devices(self) -> list[Device]:
@@ -82,7 +87,6 @@ class WolApp:
     def _setup_page(self):
         self.page.title = f"WakeOnLAN v{VERSION}" if sys.platform == "win32" else "WakeOnLAN"
         self.page.padding = 0
-        self.page.scroll = ft.ScrollMode.AUTO
         settings = self._load_settings()
         theme_key = settings.get("theme_mode", "dark")
         self._is_dark = theme_key != "light"
@@ -141,6 +145,7 @@ class WolApp:
         self.confirm_delete_dialog = build_delete_dialog(
             on_confirm=self._confirm_delete,
             on_cancel=self._cancel_delete,
+            s=s,
         )
         self.log_dialog = None
 
@@ -174,7 +179,7 @@ class WolApp:
                     lines = f.read().splitlines()[-200:]
             except Exception:
                 lines = ["(error reading log file)"]
-        self.log_dialog = build_log_viewer_dialog(lines, self._close_log, on_clear=self._on_clear_log)
+        self.log_dialog = build_log_viewer_dialog(lines, self._close_log, on_clear=self._on_clear_log, s=self._s)
 
     def _on_clear_log(self, e):
         from wol_app.logging_setup import clear_log
@@ -231,7 +236,7 @@ class WolApp:
         await self.page.show_drawer()
 
     def _navigate_to_url(self, url: str, e) -> None:
-        self.page.run_task(ft.UrlLauncher().launch_url, url)
+        self.page.run_task(self._url_launcher.launch_url, url)
 
     def show_snack(self, message: str, error: bool = False) -> None:
         if self._snackbar is not None:
@@ -262,9 +267,6 @@ class WolApp:
         sentry_sdk.add_breadcrumb(category="wol", message=f"Device click: {mac}", level="info")
         self._run_send(mac, ip, port)
 
-    def _on_dismiss_wrapper(self, idx: int, e) -> None:
-        self._on_dismiss_delete(idx)
-
     def refresh_device_list(self):
         self.device_cards.controls.clear()
         devices = self._load_devices()
@@ -275,7 +277,6 @@ class WolApp:
                 on_edit=self._on_edit,
                 on_delete=self._on_delete,
                 on_click=self._on_device_click,
-                on_dismiss=self._on_dismiss_wrapper,
                 s=self._s,
             )
             self.device_cards.controls.append(card)
@@ -291,10 +292,6 @@ class WolApp:
         self.port_input.value = str(dev.port)
         self._editing_index = index
         self.page.update()
-
-    def _on_dismiss_delete(self, index: int):
-        self._pending_delete_index = index
-        self.page.show_dialog(self.confirm_delete_dialog)
 
     def _confirm_delete(self, e):
         self.confirm_delete_dialog.open = False
@@ -347,24 +344,9 @@ class WolApp:
         except ValueError as e:
             self.show_snack(str(e), error=True)
             return
-
-        self._sending = True
-        self.wake_button.disabled = True
-        self.loading.visible = True
-        self.sending_label.visible = True
-        self.page.update()
-        sentry_sdk.add_breadcrumb(category="wol", message=f"Sending WOL: {mac}", level="info")
-
-        success, msg = await send_wol(mac, ip, port)
-
-        self.loading.visible = False
-        self.sending_label.visible = False
-        self.wake_button.disabled = False
-        self._sending = False
-        self.show_snack(msg, error=not success)
+        success, _ = await self._execute_send(mac, ip, port)
         if success:
             self._update_last_woken(mac, ip, str(port))
-        self.page.update()
 
     async def on_wake_click(self, e):
         await self.send_wol_action()
@@ -375,19 +357,25 @@ class WolApp:
             self.ip_input.value = dev_ip
         if dev_port:
             self.port_input.value = str(dev_port)
+        success, _ = await self._execute_send(mac, dev_ip or "255.255.255.255", int(dev_port) if dev_port else 9)
+        if success:
+            self._update_last_woken(mac, dev_ip, dev_port)
+
+    async def _execute_send(self, mac: str, ip: str, port: int) -> tuple[bool, str]:
         self._sending = True
         self.wake_button.disabled = True
         self.loading.visible = True
         self.sending_label.visible = True
         self.page.update()
-        success, _ = await send_wol(mac, dev_ip or "255.255.255.255", int(dev_port) if dev_port else 9)
+        sentry_sdk.add_breadcrumb(category="wol", message=f"Sending WOL: {mac} via {ip}:{port}", level="info")
+        success, msg = await send_wol(mac, ip, port)
         self.loading.visible = False
         self.sending_label.visible = False
         self.wake_button.disabled = False
         self._sending = False
-        if success:
-            self._update_last_woken(mac, dev_ip, dev_port)
+        self.show_snack(msg, error=not success)
         self.page.update()
+        return success, msg
 
     def _update_last_woken(self, mac: str, ip: str, port: str):
         devices = self._load_devices()

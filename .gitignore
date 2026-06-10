@@ -186,3 +186,8 @@ cython_debug/
 
 # Production binary icons (generated from assets/icon.png)
 icon.ico
+.idea/
+.vscode/
+
+# Generated test reports
+tests/reports/

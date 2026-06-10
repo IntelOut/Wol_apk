@@ -54,7 +54,6 @@ class TestE2EWidgets:
             on_edit=lambda i, e: None,
             on_delete=lambda i, e: None,
             on_click=lambda m, i, p, e: None,
-            on_dismiss=lambda i, e: None,
             s=get_strings("en"),
         )
         assert card is not None
